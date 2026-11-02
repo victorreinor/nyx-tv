@@ -1,0 +1,313 @@
+// Catálogo em memória dentro do worker: listas ordenadas em cache, páginas keyset,
+// grade por janela e busca. A UI só recebe CardItem/ChannelRow de cada página.
+import { programsInRange } from './epg';
+import { displayTitle, tmdbImage } from './normalize';
+import { compareBy, keysetPage, type SortSpec } from './paging';
+import { rankMatches } from './search';
+import type {
+  CardItem,
+  Category,
+  Channel,
+  ChannelRow,
+  Episode,
+  Filters,
+  HomeData,
+  Kind,
+  Movie,
+  Page,
+  Program,
+  SearchResult,
+  Series,
+  SortKey,
+  Stats,
+} from './types';
+import { STARTED, WATCHED, type UserStore } from './user';
+
+type Item = Channel | Movie | Series;
+
+export interface CatalogData {
+  channels: Channel[];
+  movies: Movie[];
+  series: Series[];
+  categories: Category[];
+  m3uEpisodes?: Map<number, Episode[]> | null;
+  at: number;
+}
+
+const FAV_PREFIX: Record<Kind, string> = { live: 'l:', movie: 'm:', series: 's:' };
+
+export class Catalog {
+  channels: Channel[] = [];
+  movies: Movie[] = [];
+  series: Series[] = [];
+  categories: Category[] = [];
+  epg = new Map<string, Program[]>();
+  m3uEpisodes: Map<number, Episode[]> | null = null;
+  catalogAt = 0;
+  epgAt = 0;
+  filters: Filters = { hideAdult: true, hiddenCategories: [] };
+
+  channelById = new Map<string, Channel>();
+  movieById = new Map<number, Movie>();
+  seriesById = new Map<number, Series>();
+  private cache = new Map<string, Item[]>();
+  private hidden = new Set<string>();
+  private keys: Record<Kind, string[]> = { live: [], movie: [], series: [] };
+
+  constructor(private user: UserStore) {}
+
+  get hasData(): boolean {
+    return this.catalogAt > 0;
+  }
+
+  setCatalog(d: CatalogData) {
+    this.channels = d.channels;
+    this.movies = d.movies;
+    this.series = d.series;
+    this.categories = d.categories;
+    this.m3uEpisodes = d.m3uEpisodes || null;
+    this.catalogAt = d.at;
+    this.channelById = new Map(d.channels.map((c) => [c.id, c] as [string, Channel]));
+    this.movieById = new Map(d.movies.map((m) => [m.id, m] as [number, Movie]));
+    this.seriesById = new Map(d.series.map((s) => [s.id, s] as [number, Series]));
+    this.keys = { live: d.channels.map((c) => c.key), movie: d.movies.map((m) => m.key), series: d.series.map((s) => s.key) };
+    const counts = new Map<string, number>();
+    const count = (list: Item[]) => list.forEach((it) => it.categories.forEach((c) => counts.set(c, (counts.get(c) || 0) + 1)));
+    count(d.channels);
+    count(d.movies);
+    count(d.series);
+    this.categories.forEach((c) => (c.count = counts.get(c.id) || 0));
+    this.cache.clear();
+  }
+
+  private epgUntil = 0;
+
+  setEpg(map: Map<string, Program[]>, at: number) {
+    this.epg = map;
+    this.epgAt = at;
+    let until = 0;
+    map.forEach((list) => {
+      const last = list[list.length - 1];
+      if (last && last.stop > until) until = last.stop;
+    });
+    this.epgUntil = until;
+  }
+
+  setFilters(f: Filters) {
+    this.filters = f;
+    this.hidden = new Set(f.hiddenCategories);
+    this.cache.clear();
+  }
+
+  stats(): Stats {
+    return {
+      live: this.channels.length,
+      movies: this.movies.length,
+      series: this.series.length,
+      epgChannels: this.epg.size,
+      epgUntil: this.epgUntil,
+      catalogAt: this.catalogAt,
+      epgAt: this.epgAt,
+    };
+  }
+
+  private visible = (it: Item): boolean => {
+    if (this.filters.hideAdult && it.adult) return false;
+    if (!this.hidden.size || !it.categories.length) return true;
+    for (const c of it.categories) if (!this.hidden.has(c)) return true;
+    return false;
+  };
+
+  /** Categorias para navegar (sem as ocultas e, se ativo, sem adultas). */
+  categoriesOf(kind: Kind, includeHidden = false): Category[] {
+    return this.categories.filter(
+      (c) => c.kind === kind && c.count > 0 && !(this.filters.hideAdult && c.adult) && (includeHidden || !this.hidden.has(c.id)),
+    );
+  }
+
+  private source(kind: Kind): Item[] {
+    return kind === 'live' ? this.channels : kind === 'movie' ? this.movies : this.series;
+  }
+
+  private spec(kind: Kind, sort: SortKey): SortSpec<Item> {
+    const id = (it: Item) => it.id;
+    if (sort === 'name') return { value: (it) => (it as Movie).key || '', id, dir: 1 };
+    if (kind === 'live' || sort === 'num') return { value: (it) => (it as Channel).num || 0, id, dir: 1 };
+    if (sort === 'rating') return { value: (it) => (it as Movie).rating || 0, id, dir: -1 };
+    return { value: (it) => (it as Movie).added || 0, id, dir: -1 };
+  }
+
+  private list(kind: Kind, category: string, sort: SortKey): Item[] {
+    const key = `${kind}|${category}|${sort}`;
+    const dynamic = category === 'fav' || (kind === 'live' && category === 'recent');
+    const cached = !dynamic && this.cache.get(key);
+    if (cached) return cached;
+    let items: Item[];
+    if (category === 'fav') {
+      items = this.user
+        .favKeys(FAV_PREFIX[kind])
+        .map((id) => this.lookup(kind, id))
+        .filter((it): it is Item => !!it && this.visible(it));
+    } else if (category === 'recent' && kind === 'live') {
+      items = this.user.state.recentChannels.map((id) => this.channelById.get(id)).filter((it): it is Channel => !!it && this.visible(it));
+      return items;
+    } else if (category === 'recent') {
+      items = this.source(kind)
+        .filter(this.visible)
+        .sort(compareBy(this.spec(kind, 'added')))
+        .slice(0, 200);
+    } else if (category === 'all') {
+      items = this.source(kind).filter(this.visible);
+    } else {
+      items = this.source(kind).filter((it) => it.categories.indexOf(category) !== -1 && !(this.filters.hideAdult && it.adult));
+    }
+    items.sort(compareBy(this.spec(kind, sort)));
+    if (!dynamic) this.cache.set(key, items);
+    return items;
+  }
+
+  lookup(kind: Kind, id: string): Item | undefined {
+    if (kind === 'live') return this.channelById.get(id);
+    if (kind === 'movie') return this.movieById.get(Number(id));
+    return this.seriesById.get(Number(id));
+  }
+
+  page(kind: Kind, category: string, sort: SortKey, cursor: string | null, limit: number): Page<CardItem> {
+    const list = this.list(kind, category, sort);
+    const { items, next } = keysetPage(list, this.spec(kind, sort), cursor, limit);
+    const now = Date.now() / 1000;
+    return { items: items.map((it) => this.card(kind, it, now)), next, total: list.length };
+  }
+
+  card(kind: Kind, it: Item, now = Date.now() / 1000): CardItem {
+    if (kind === 'live') {
+      const ch = it as Channel;
+      const cur = this.nowNext(ch.id, now).now;
+      return { kind, id: ch.id, title: ch.name, image: ch.logo, sub: cur ? cur.title : '', badges: ch.variants.map((v) => v.quality).filter(uniqueQuality) };
+    }
+    if (kind === 'movie') {
+      const m = it as Movie;
+      const p = this.user.getProgress('m:' + m.id);
+      const progress = p && p.duration ? p.position / p.duration : 0;
+      return {
+        kind,
+        id: String(m.id),
+        title: displayTitle(m.name),
+        image: tmdbImage(m.poster, 'w342'),
+        sub: m.year ? String(m.year) : '',
+        progress: progress >= STARTED && progress < WATCHED ? progress : undefined,
+      };
+    }
+    const s = it as Series;
+    return {
+      kind,
+      id: String(s.id),
+      title: displayTitle(s.name),
+      image: tmdbImage(s.poster, 'w342'),
+      backdrop: tmdbImage(s.backdrop, 'w1280'),
+      sub: [s.year || '', s.genre.split(',')[0]].filter(Boolean).join(' · '),
+    };
+  }
+
+  nowNext(channelId: string, now = Date.now() / 1000): { now?: Program; next?: Program } {
+    const ch = this.channelById.get(channelId);
+    const list = ch && ch.epgId ? this.epg.get(ch.epgId) : undefined;
+    const range = programsInRange(list, now, now + 6 * 3600);
+    const cur = range[0] && range[0].start <= now ? range[0] : undefined;
+    return { now: cur, next: cur ? range[1] : range[0] };
+  }
+
+  private row(ch: Channel, from: number, to: number): ChannelRow {
+    return {
+      id: ch.id,
+      num: ch.num,
+      name: ch.name,
+      logo: ch.logo,
+      qualities: ch.variants.map((v) => v.quality).filter(uniqueQuality),
+      fav: this.user.isFav('l:' + ch.id),
+      programs: ch.epgId ? programsInRange(this.epg.get(ch.epgId), from, to) : [],
+    };
+  }
+
+  /** Grade: página de canais + programas dentro da janela de tempo. */
+  guide(category: string, cursor: string | null, limit: number, from: number, to: number): Page<ChannelRow> {
+    const list = this.list('live', category, 'num') as Channel[];
+    const { items, next } = keysetPage(list as Item[], this.spec('live', 'num'), cursor, limit);
+    return { items: (items as Channel[]).map((ch) => this.row(ch, from, to)), next, total: list.length };
+  }
+
+  channelRow(id: string, from: number, to: number): ChannelRow | null {
+    const ch = this.channelById.get(id);
+    return ch ? this.row(ch, from, to) : null;
+  }
+
+  /** Vizinho na lista atual (CH▲/CH▼ no player). */
+  neighborChannel(id: string, category: string, step: number): string | null {
+    const list = this.list('live', category, 'num');
+    const i = list.findIndex((c) => c.id === id);
+    if (i === -1 || !list.length) return null;
+    return String(list[(i + step + list.length) % list.length].id);
+  }
+
+  search(q: string, limit: number): SearchResult {
+    const t0 = Date.now();
+    const run = <T extends Item>(kind: Kind, list: T[]) =>
+      rankMatches(this.keys[kind], q, limit, (i) => this.visible(list[i])).map((i) => this.card(kind, list[i]));
+    const live = run('live', this.channels);
+    const movies = run('movie', this.movies);
+    const series = run('series', this.series);
+    return { live, movies, series, total: live.length + movies.length + series.length, ms: Date.now() - t0 };
+  }
+
+  continueItems(limit: number): CardItem[] {
+    const out: CardItem[] = [];
+    const seenSeries = new Set<number>();
+    for (const p of this.user.recentProgress()) {
+      if (out.length >= limit) break;
+      const pct = p.duration ? p.position / p.duration : 0;
+      if (p.kind === 'movie') {
+        const m = this.movieById.get(Number(p.id));
+        if (!m || !this.visible(m) || pct < STARTED || pct >= WATCHED) continue;
+        out.push({ ...this.card('movie', m), sub: remaining(p), progress: pct, resume: { position: p.position } });
+        continue;
+      }
+      if (!p.seriesId || seenSeries.has(p.seriesId)) continue;
+      seenSeries.add(p.seriesId);
+      const s = this.seriesById.get(p.seriesId);
+      if (!s || !this.visible(s)) continue;
+      const base = this.card('series', s);
+      if (pct < WATCHED) {
+        if (pct < STARTED && p.position < 60) continue;
+        out.push({ ...base, sub: `T${p.season} E${p.episode} · ${remaining(p)}`, progress: pct, resume: { episodeId: p.id, season: p.season, episode: p.episode, ext: p.ext, position: p.position } });
+      } else if (p.next) {
+        out.push({ ...base, sub: `T${p.next.season} E${p.next.episode}`, progress: 0, resume: { episodeId: p.next.id, season: p.next.season, episode: p.next.episode, ext: p.next.ext, position: 0 } });
+      }
+    }
+    return out;
+  }
+
+  home(): HomeData {
+    const now = Date.now() / 1000;
+    const continueItems = this.continueItems(20);
+    const favIds = this.user.favKeys('l:');
+    const ids = favIds.length ? favIds : this.user.state.recentChannels;
+    const favChannels = ids
+      .map((id) => this.channelById.get(id))
+      .filter((c): c is Channel => !!c && this.visible(c))
+      .slice(0, 20)
+      .map((c) => this.row(c, now, now + 3600));
+    const recentMovies = this.page('movie', 'recent', 'added', null, 20).items;
+    const recentSeries = this.page('series', 'recent', 'added', null, 20).items;
+    const hero = continueItems[0] || recentSeries.find((s) => !!s.backdrop) || recentMovies[0] || null;
+    return { hero, continueItems, favChannels, recentMovies, recentSeries };
+  }
+}
+
+function uniqueQuality<T>(q: T, i: number, arr: T[]): boolean {
+  return arr.indexOf(q) === i;
+}
+
+function remaining(p: { position: number; duration: number }): string {
+  const min = Math.max(1, Math.round((p.duration - p.position) / 60));
+  return min >= 60 ? `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, '0')}` : `${min} min`;
+}

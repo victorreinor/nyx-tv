@@ -1,0 +1,165 @@
+/* Componentes do Nyx. Foco = classe .is-focused (anel claro + leve aumento). */
+
+/* ---------- botão ---------- */
+.btn {
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 12px;
+  height: 64px;
+  padding: 0 30px;
+  border-radius: var(--r-btn);
+  border: var(--ring-w) solid transparent;
+  font-size: 24px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: transform var(--fast) var(--ease);
+}
+.btn--primary { background: var(--accent); color: var(--on-accent); }
+.btn--secondary { background: var(--s3); color: var(--t1); }
+.btn--ghost { background: transparent; color: var(--t2); }
+.btn--danger { background: transparent; color: var(--live-fg); }
+.btn.is-focused { border-color: var(--t1); transform: scale(1.06); }
+.btn--secondary.is-focused, .btn--ghost.is-focused, .btn--danger.is-focused { background: var(--s4); border-color: var(--ring); color: var(--t1); }
+
+/* ---------- selos ---------- */
+.badge {
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 11px;
+  border-radius: var(--r-badge);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--s3);
+  color: var(--t1);
+  white-space: nowrap;
+}
+.badge--muted { background: var(--s2); color: var(--t3); }
+.badge--accent { background: #2a2440; color: #d6cfff; }
+.badge--ok { background: var(--ok-bg); color: var(--ok); }
+.badge--warn { background: var(--warn-bg); color: var(--warn); }
+.badge--live { background: var(--live-bg); color: var(--live-fg); }
+.live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--live); }
+
+/* ---------- chip ---------- */
+.chip {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  height: 56px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background: var(--s1);
+  color: var(--t2);
+  font-size: 20px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.chip > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.chip__count { font-size: 16px; color: var(--t3); font-weight: 600; }
+.chip.is-selected { background: var(--s3); color: var(--t1); }
+.chip.is-focused { background: var(--s4); color: var(--t1); border-color: var(--ring); }
+
+/* ---------- toggle / progresso / spinner ---------- */
+.toggle { position: relative; display: inline-block; width: 64px; height: 36px; border-radius: 999px; background: var(--s4); flex-shrink: 0; }
+.toggle__knob { position: absolute; top: 4px; left: 4px; width: 28px; height: 28px; border-radius: 50%; background: var(--t2); transition: transform var(--fast) var(--ease); }
+.toggle.is-on { background: var(--accent); }
+.toggle.is-on .toggle__knob { transform: translateX(28px); background: var(--on-accent); }
+
+.progress { width: 100%; background: rgba(52, 52, 74, 0.85); border-radius: 6px; overflow: hidden; }
+.progress__bar { height: 100%; width: 100%; transform-origin: left center; }
+.progress__bar--accent { background: var(--accent); }
+.progress__bar--live { background: var(--live); }
+.progress__bar--muted { background: var(--t3); }
+
+.spinner { border-radius: 50%; border: 5px solid var(--s3); border-top-color: var(--accent); animation: nyx-spin 0.9s linear infinite; }
+@keyframes nyx-spin { to { transform: rotate(360deg); } }
+
+/* ---------- imagens ---------- */
+.img-fallback { display: flex; align-items: center; justify-content: center; background: var(--s3); color: var(--t2); font-weight: 800; font-size: 22px; letter-spacing: 0.04em; }
+.channel-logo { width: 72px; height: 72px; border-radius: 14px; background: var(--s3); object-fit: contain; padding: 8px; flex-shrink: 0; }
+
+/* ---------- cards ---------- */
+.card { position: relative; transition: transform var(--fast) var(--ease); transform-origin: center top; }
+.card__frame { position: relative; overflow: hidden; border-radius: var(--r-card); background: var(--s2); border: var(--ring-w) solid transparent; }
+.card--poster .card__frame { width: 200px; height: 300px; }
+.card__img { width: 100%; height: 100%; object-fit: cover; }
+.card__frame .img-fallback { width: 100%; height: 100%; padding: 16px; text-align: center; }
+.card__title { margin-top: 12px; font-size: 21px; font-weight: 700; color: var(--t2); }
+.card__sub { margin-top: 2px; font-size: 18px; color: var(--t3); }
+.card__progress { position: absolute; left: 0; right: 0; bottom: 0; }
+.card__progress .progress { border-radius: 0; }
+.card__tag { position: absolute; top: 12px; left: 12px; padding: 5px 11px; border-radius: var(--r-badge); background: rgba(10, 10, 18, 0.8); font-size: 15px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.card.is-focused { transform: scale(1.08); z-index: 2; }
+.card.is-focused .card__frame { border-color: var(--ring); }
+.card.is-focused .card__title { color: var(--t1); }
+
+.channel-card { display: flex; align-items: center; width: 352px; height: 120px; padding: 16px 20px; border-radius: var(--r-card); background: var(--s1); border: var(--ring-w) solid transparent; transition: transform var(--fast) var(--ease); }
+.channel-card .channel-logo { margin-right: 16px; }
+.channel-card.is-focused { background: var(--s3); border-color: var(--ring); transform: scale(1.05); }
+
+.channel-line { display: flex; align-items: center; height: 104px; padding: 0 20px; border-radius: 16px; border: var(--ring-w) solid transparent; background: var(--s1); }
+.channel-line > * + * { margin-left: 20px; }
+.channel-line__num { width: 52px; font-size: 20px; color: var(--t3); font-weight: 700; }
+.channel-line.is-focused { background: var(--s3); border-color: var(--ring); }
+
+/* ---------- rail / grid ---------- */
+.rail { position: relative; }
+.rail__title { margin-bottom: 18px; padding-left: 4px; }
+.rail__viewport { position: relative; overflow: visible; }
+.rail__track { position: absolute; top: 0; left: 0; height: 100%; transition: transform var(--slow) var(--ease); will-change: transform; }
+.rail__item { position: absolute; top: 0; left: 0; }
+.vgrid { position: relative; overflow: hidden; padding: 12px 16px 0; margin: -12px -16px 0; }
+.vgrid__track { position: absolute; top: 12px; left: 16px; transition: transform var(--slow) var(--ease); will-change: transform; }
+.vgrid__cell { position: absolute; top: 0; left: 0; }
+.chiprow .rail__item > .chip { width: 250px; }
+
+/* ---------- opção de lista ---------- */
+.option { display: flex; align-items: center; min-height: 72px; padding: 14px 24px; border-radius: var(--r-btn); border: var(--ring-w) solid transparent; color: var(--t2); }
+.option > * + * { margin-left: 16px; }
+.option__label { font-size: 23px; font-weight: 700; }
+.option__hint { font-size: 18px; color: var(--t3); font-weight: 500; }
+.option__check { color: var(--ring); }
+.option.is-selected { color: var(--t1); }
+.option.is-focused { background: var(--s3); border-color: var(--ring); color: var(--t1); }
+
+/* ---------- teclado / pin ---------- */
+.kbd { display: grid; grid-template-columns: repeat(6, 74px); gap: 8px; }
+.kbd--actions { grid-template-columns: repeat(3, 1fr); }
+.kbd__key { height: 60px; border-radius: 12px; background: var(--s2); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; border: var(--ring-w) solid transparent; }
+.kbd__key--wide { font-size: 19px; }
+.kbd__key.is-focused { background: var(--s4); border-color: var(--ring); }
+.pin__boxes { justify-content: center; }
+.pin__box { width: 64px; height: 76px; border-radius: 14px; background: var(--s2); display: flex; align-items: center; justify-content: center; font-size: 40px; border: 2px solid var(--line); }
+.pin__box.is-filled { border-color: var(--accent); }
+.pinpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.pinpad__key { height: 72px; border-radius: 14px; background: var(--s2); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; border: var(--ring-w) solid transparent; }
+.pinpad__key.is-focused { background: var(--s4); border-color: var(--ring); }
+
+/* ---------- modal / toast ---------- */
+.modal { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 50; background: rgba(5, 5, 10, 0.78); display: flex; align-items: center; justify-content: center; }
+.modal__panel { padding: 40px; border-radius: var(--r-panel); background: var(--s1); border: 1px solid var(--line); }
+.toast { position: absolute; z-index: 60; left: 50%; bottom: 64px; transform: translateX(-50%); padding: 16px 28px; border-radius: 999px; background: var(--s2); border: 1px solid var(--line); font-size: 22px; font-weight: 600; white-space: nowrap; animation: nyx-toast var(--slow) var(--ease); }
+@keyframes nyx-toast { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ---------- teclas coloridas ---------- */
+.colorkeys { font-size: 20px; color: var(--t2); }
+.colorkey { display: inline-block; width: 18px; height: 18px; border-radius: 4px; }
+.colorkey--red { background: var(--red); }
+.colorkey--green { background: var(--green); }
+.colorkey--yellow { background: var(--yellow); }
+.colorkey--blue { background: var(--blue); }
+
+/* ---------- campo de texto (formulários usam o teclado nativo da TV) ---------- */
+.field { display: grid; gap: 8px; }
+.field__label { font-size: 18px; color: var(--t3); font-weight: 700; }
+.field__input { height: 68px; padding: 0 22px; border-radius: 14px; border: 3px solid var(--line); background: var(--bg); color: var(--t1); font: 600 24px 'Manrope', sans-serif; outline: none; width: 100%; }
+.field.is-focused .field__input { border-color: var(--ring); background: var(--s2); }

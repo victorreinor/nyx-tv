@@ -1,0 +1,25 @@
+{
+  "name": "nyx-tv",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && vite build -c vite.worker.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "tv": "./scripts/tv.sh",
+    "report": "bun tools/report-server.ts"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.18"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "acorn": "^8.19.0",
+    "puppeteer-core": "^25.16.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vite-plugin-solid": "^2.11.15"
+  }
+}

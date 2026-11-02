@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Nyx</title>
+    <!-- APIs da Samsung (AVPlay, productinfo). Na TV o runtime resolve $WEBAPIS; no Mac dá 404 e o app usa <video>. -->
+    <script src="$WEBAPIS/webapis/webapis.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/index.tsx"></script>
+  </body>
+</html>
