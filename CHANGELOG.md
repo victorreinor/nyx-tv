@@ -8,6 +8,11 @@ Gerado por `bun run release patch|minor|major`.
 
 ### Novidades
 - atualização sem cabo pelo GitHub Pages, com hash e volta automática
+- quem tem a 1.3.1 ou anterior instala esta pelo celular/PC uma última vez; daqui em diante o Nyx se atualiza sozinho
+
+## [1.3.1] — 2026-11-02
+
+### Novidades
 - nyx.wgt em cada release do GitHub para instalar pelo celular
 
 ### Outros
