@@ -23,6 +23,7 @@ Ordem = valor para quem assiste ÷ esforço. Cada entrega vira uma versão (SemV
 
 ## 1.2 — séries e grade
 
+- [ ] **Versão dublada ⇄ legendada**: o provedor cadastra cada versão como um filme separado ("Filme" e "Filme [L]") com uma faixa só cada, então a troca de áudio do player não tem o que mostrar. Na tela do filme, um botão acha e abre a outra versão.
 - [ ] **Novos episódios**: selo nas séries favoritas quando o provedor adicionar episódio (compara com a última vez que você abriu a série).
 - [ ] **Lembretes**: na grade, marcar um programa futuro; quando começar, o app avisa e OK sintoniza. Só funciona com o Nyx aberto, porque a TV não deixa app comum avisar fechado.
 

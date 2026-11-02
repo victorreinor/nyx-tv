@@ -180,3 +180,4 @@ html.is-playing { background: transparent; }
 .mini-row__next { font-size: 16px; color: var(--t3); }
 .mini-row.is-playing .mini-row__name { color: var(--ring); }
 .mini-row.is-focused { background: var(--s3); border-color: var(--ring); }
+.player__wait { justify-items: center; text-align: center; max-width: 720px; padding: 18px 28px; border-radius: var(--r-panel); background: rgba(10, 10, 18, 0.8); }

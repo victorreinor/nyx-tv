@@ -197,7 +197,12 @@ export const player = {
   seek(ms: number): Promise<void> {
     const target = Math.max(0, ms);
     const av = avplay();
-    if (av) return new Promise((resolve) => safe(() => av.seekTo(target, () => resolve(), () => resolve()), resolve()));
+    if (av) {
+      // seekTo antes de PLAYING/PAUSED/READY prende o AVPlay (e a TV) em arquivo lento
+      const state = safe(() => av.getState(), 'NONE');
+      if (state !== 'PLAYING' && state !== 'PAUSED' && state !== 'READY') return Promise.resolve();
+      return new Promise((resolve) => safe(() => av.seekTo(target, () => resolve(), () => resolve()), resolve()));
+    }
     if (!video) return Promise.resolve();
     const v = video;
     return new Promise((resolve) => {

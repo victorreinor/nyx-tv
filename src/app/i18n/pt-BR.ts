@@ -220,6 +220,11 @@ export const ptBR = {
   'lang.de': 'Alemão',
   'lang.ja': 'Japonês',
   'lang.ko': 'Coreano',
+  'player.waitStart': 'Aguarde o vídeo começar para avançar ou voltar',
+  'player.loading': 'Carregando… {n} s',
+  'player.slow': 'Está demorando mais que o normal. Arquivos 4K podem levar até 1 minuto.',
+  'player.backToCancel': 'Voltar cancela',
+  'player.sleepMin': 'Timer para dormir (min)',
 };
 
 export type MessageKey = keyof typeof ptBR;

@@ -221,4 +221,9 @@ export const en: Record<MessageKey, string> = {
   'lang.de': 'German',
   'lang.ja': 'Japanese',
   'lang.ko': 'Korean',
+  'player.waitStart': 'Wait for the video to start before seeking',
+  'player.loading': 'Loading… {n}s',
+  'player.slow': 'This is taking longer than usual. 4K files can take up to a minute.',
+  'player.backToCancel': 'Back cancels',
+  'player.sleepMin': 'Sleep timer (min)',
 };

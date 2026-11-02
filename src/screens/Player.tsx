@@ -1,5 +1,5 @@
 // Player em tela cheia: canal ao vivo (qualidade automática) ou filme/episódio (progresso salvo).
-import { createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js';
 import { call } from '../data/client';
 import type { ChannelRow, Episode, PlaySource, Quality } from '../data/types';
 import { FocusZone, pushKeyHandler, trapCount } from '../app/focus';
@@ -28,6 +28,8 @@ const SEEK_COMMIT_MS = 700;
 const VOD_STARTUP_MS = 25000;
 /** CH▲▼ seguidos: só sintoniza quando para de apertar. */
 const ZAP_MS = 700;
+/** Filme/episódio carregando no meio da reprodução por mais que isso: mostra erro com "tentar de novo". */
+const VOD_STALL_S = 30;
 
 export function Player(props: { media: Media }) {
   const m = props.media;
@@ -44,6 +46,18 @@ export function Player(props: { media: Media }) {
   const [tracks, setTracks] = createSignal<Tracks>({ audio: [], text: [], audioCurrent: -1, textCurrent: -1 });
   const [subtitle, setSubtitle] = createSignal('');
   const [guide, setGuide] = createSignal<{ rows: ChannelRow[]; index: number } | null>(null);
+  /** Segundos esperando (carregando/travado), para dar feedback em vez de girar calado. */
+  const [waitSec, setWaitSec] = createSignal(0);
+  let waitTimer: ReturnType<typeof setInterval> | undefined;
+  createEffect(
+    on(status, (st) => {
+      clearInterval(waitTimer);
+      setWaitSec(0);
+      if (st !== 'loading' && st !== 'buffering') return;
+      const t0 = Date.now();
+      waitTimer = setInterval(() => setWaitSec(Math.floor((Date.now() - t0) / 1000)), 1000);
+    }),
+  );
   let subTimer: ReturnType<typeof setTimeout> | undefined;
   let audioChecked = false; // escolha automática do áudio: uma vez por stream aberto
   let audioTimer: ReturnType<typeof setTimeout> | undefined;
@@ -381,6 +395,12 @@ export function Player(props: { media: Media }) {
       else if (k === 'blue') call('toggleFav', 'live', channelId()).then((on) => toast(on ? t('toast.favAdded') : t('toast.favRemoved')));
       return true;
     }
+    const seeking = k === 'left' || k === 'right' || k === 'rw' || k === 'ff';
+    if (seeking && status() !== 'playing' && !paused()) {
+      // pular antes do vídeo começar pedia trechos novos ao servidor lento e podia travar a TV
+      toast(t('player.waitStart'));
+      return true;
+    }
     if (k === 'enter' || k === 'playpause') togglePause();
     else if (k === 'play' && paused()) togglePause();
     else if (k === 'pause' && !paused()) togglePause();
@@ -413,6 +433,7 @@ export function Player(props: { media: Media }) {
         setSubtitle(text.replace(/<[^>]+>/g, ''));
         clearTimeout(subTimer);
     clearTimeout(audioTimer);
+    clearInterval(waitTimer);
         subTimer = setTimeout(() => setSubtitle(''), Math.max(800, durationMs || 3000));
       },
       onTime: (ms) => {
@@ -442,6 +463,7 @@ export function Player(props: { media: Media }) {
       if (status() === 'error' || seeking) return;
       if (m.kind !== 'live') {
         if (status() === 'loading' && !awaitingAdvance && vodOpenedAt && Date.now() - vodOpenedAt > VOD_STARTUP_MS) retryVod();
+        else if (status() === 'buffering' && waitSec() > VOD_STALL_S) setStatus('error');
         return;
       }
       const v = monitor.verdict();
@@ -459,6 +481,7 @@ export function Player(props: { media: Media }) {
     clearTimeout(zapTimer);
     clearTimeout(subTimer);
     clearTimeout(audioTimer);
+    clearInterval(waitTimer);
     player.setEvents(null);
     player.stop();
   });
@@ -498,7 +521,7 @@ export function Player(props: { media: Media }) {
   const sleepOptions = createMemo<OptionItem[]>(() =>
     SLEEP_OPTIONS.map((min) => ({
       id: String(min),
-      label: min ? `${min} min` : t('common.off'),
+      label: min ? String(min) : t('common.off'),
       hint: min && min === sleepChoice() && sleepAt() ? t('player.sleepAt', { t: fmtTime(sleepAt()! / 1000) }) : undefined,
     })),
   );
@@ -525,8 +548,17 @@ export function Player(props: { media: Media }) {
         </div>
       </Show>
       <Show when={seekTarget() === null && (status() === 'loading' || status() === 'buffering')}>
-        <div class="player__center">
+        <div class="player__center stack g16" style={{ 'justify-items': 'center' }}>
           <Spinner size={72} />
+          <Show when={waitSec() >= 3}>
+            <div class="player__wait stack g8">
+              <span class="t-card">{t('player.loading', { n: waitSec() })}</span>
+              <Show when={waitSec() >= 8}>
+                <span class="t-caption c-2">{t('player.slow')}</span>
+                <span class="t-caption c-3">{t('player.backToCancel')}</span>
+              </Show>
+            </div>
+          </Show>
         </div>
       </Show>
       <Show when={status() === 'error'}>
@@ -670,7 +702,7 @@ export function Player(props: { media: Media }) {
               }}
             />
           </Show>
-          <span class="t-micro c-3 player__panel-label">{t('player.sleep')}</span>
+          <span class="t-micro c-3 player__panel-label">{t('player.sleepMin')}</span>
           <OptionList
             axis="row"
             class="player__sleep"

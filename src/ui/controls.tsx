@@ -103,7 +103,7 @@ export function OptionList(props: {
         {(o, i) => (
           <div
             class="option"
-            ref={(el) => createEffect(() => list.isFocused(i()) && el.scrollIntoView({ block: 'nearest' }))}
+            ref={(el) => createEffect(() => (props.axis || 'col') === 'col' && list.isFocused(i()) && el.scrollIntoView({ block: 'nearest' }))}
             classList={{ 'is-focused': list.isFocused(i()), 'is-selected': !!props.selected && props.selected() === o.id }}
           >
             <Show when={o.icon}>
