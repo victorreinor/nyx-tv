@@ -154,9 +154,11 @@ object.video-layer { background: transparent; }
 .player__seek { justify-items: center; padding: 28px 44px; border-radius: var(--r-panel); background: rgba(10, 10, 18, 0.82); border: 1px solid var(--line); }
 .player__seek-time { font-size: 64px; font-weight: 800; letter-spacing: -0.02em; }
 .player__seek-delta { font-size: 26px; font-weight: 700; color: var(--ring); }
-.live__thumb.has-video { background: transparent; border-color: var(--ring); }
-.live__thumb-caption { position: absolute; left: 16px; bottom: 14px; padding: 4px 10px; border-radius: 8px; background: rgba(10, 10, 18, 0.8); font-size: 17px; font-weight: 700; }
 .settings__subtitle { margin-top: 16px; }
 .settings__inline { grid-template-columns: repeat(6, auto); grid-auto-flow: row; justify-content: start; }
 .settings__inline .option { min-height: 60px; padding: 10px 20px; }
 .player__next-btn { position: absolute; z-index: 4; right: var(--safe-x); bottom: 200px; }
+
+/* tela cheia: a página fica transparente para o vídeo (camada de baixo) aparecer */
+html.is-playing { background: transparent; }
+.video-layer--full { left: 0; top: 0; width: 1920px; height: 1080px; }

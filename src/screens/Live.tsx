@@ -1,5 +1,5 @@
 // TV ao vivo: grade de programação. ◀ ▶ andam no tempo, ▲ ▼ trocam de canal, OK assiste.
-import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show, untrack } from 'solid-js';
+import { createEffect, createMemo, createResource, createSignal, For, on, Show, untrack } from 'solid-js';
 import { call } from '../data/client';
 import type { ChannelRow, Program } from '../data/types';
 import { FocusZone, type ListHandle } from '../app/focus';
@@ -8,7 +8,6 @@ import { playChannel } from '../app/play';
 import { usePaged } from '../app/paged';
 import { dataVersion, stats, toast } from '../app/state';
 import { top } from '../app/router';
-import { player, preview, stopPreview } from '../player/engine';
 import { ChipRow, type ChipItem } from '../ui/controls';
 import { Img, LiveBadge, QualityBadges, ColorKeys } from '../ui/primitives';
 import { VGrid } from '../ui/VGrid';
@@ -23,8 +22,6 @@ const ROW_H = 88;
 const ROW_GAP = 8;
 
 const floorHalfHour = (s: number) => Math.floor(s / STEP) * STEP;
-/** Posição da caixinha de prévia (reserva caso a medição falhe). */
-const THUMB_RECT = { x: 1344, y: 55, w: 480, h: 270 };
 
 function programAt(list: Program[], at: number): number {
   for (let i = 0; i < list.length; i++) if (list[i].start <= at && list[i].stop > at) return i;
@@ -54,25 +51,9 @@ export function Live() {
     () => [category(), range(), dataVersion()],
   );
 
-  // Prévia: o canal que você estava vendo continua na caixinha até escolher outro.
-  let thumb: HTMLDivElement | undefined;
+  // Voltou do player para a grade: ela volta para "agora".
   const isTop = () => top().name === 'live';
-  const showPreview = () => !!preview() && isTop();
-  createEffect(() => {
-    if (!showPreview()) return;
-    // a tela da grade acabou de reaparecer: mede só depois do layout (antes disso ela mede 0×0)
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        const r = thumb ? thumb.getBoundingClientRect() : null;
-        player.setRect(r && r.width > 0 ? { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) } : THUMB_RECT);
-      }),
-    );
-    // voltou de um canal: a grade volta para "agora" (untrack: o relógio não pode reexecutar isto)
-    untrack(goNow);
-  });
-  const [previewRow] = createResource(preview, (p) => call('channelRow', p.channelId, Date.now() / 1000, Date.now() / 1000 + 60));
-  // saiu da TV ao vivo (outra seção): fecha o vídeo e libera a conexão
-  onCleanup(stopPreview);
+  createEffect(on(isTop, (visible, was) => visible && was === false && untrack(goNow)));
 
   const focusedRow = () => {
     const g = grid();
@@ -167,28 +148,14 @@ export function Live() {
             </Show>
           </Show>
         </div>
-        <div class="live__thumb" classList={{ 'has-video': showPreview() }} ref={thumb}>
-          <Show
-            when={showPreview()}
-            fallback={
-              <>
-                <Show when={focusedRow()}>
-                  <Img class="live__thumb-logo" src={focusedRow()!.logo} alt={focusedRow()!.name} />
-                </Show>
-                <Show when={focusedProgram() && focusedProgram()!.start <= nowSec()}>
-                  <span class="live__thumb-badge">
-                    <LiveBadge label={t('live.liveBadge')} />
-                  </span>
-                </Show>
-              </>
-            }
-          >
+        <div class="live__thumb">
+          <Show when={focusedRow()}>
+            <Img class="live__thumb-logo" src={focusedRow()!.logo} alt={focusedRow()!.name} />
+          </Show>
+          <Show when={focusedProgram() && focusedProgram()!.start <= nowSec()}>
             <span class="live__thumb-badge">
               <LiveBadge label={t('live.liveBadge')} />
             </span>
-            <Show when={previewRow()}>
-              <span class="live__thumb-caption">▶ {previewRow()!.name}</span>
-            </Show>
           </Show>
         </div>
       </section>

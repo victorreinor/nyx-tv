@@ -36,7 +36,6 @@ searches 40 thousand titles while you type.
 | | |
 |---|---|
 | 📺 **Real TV guide** | 8-day EPG grid with a "now" line, time navigation with ◀ ▶ and category filters. |
-| 🖼️ **Live preview** | Back out of a channel and it keeps playing in the guide's preview box, with no reload and no extra connection. |
 | 🎚️ **Smart quality** | SD/HD/FHD/4K variants become one channel. If a stream stalls, Nyx drops a level on its own (4K → FHD → HD → SD) and remembers it. |
 | ▶️ **Continue watching** | Movies and episodes resume at the exact second. "Next episode" button near the end, plus autoplay. |
 | 🔍 **Instant search** | In-memory search across channels, movies and series: 10–35 ms on the TV, accent-insensitive. |
@@ -144,7 +143,7 @@ XC_PASS=your_password
 | ◀ ▶ | move in time | — | −10 s / +10 s (hold to speed up) |
 | ▲ ▼ | change channel | change channel (with debounce) | show info |
 | OK | watch | show info | pause / play |
-| Back | now → categories → menu | show info → exit (keeps preview) | show info → exit |
+| Back | now → categories → menu | show info → exit | show info → exit |
 | 🔴 Red | jump to now | — | — |
 | 🟢 Green | categories | — | — |
 | 🟡 Yellow | — | quality panel | — |
@@ -214,7 +213,6 @@ junta as versões SD/HD/FHD/4K do mesmo canal, lembra exatamente onde você paro
 | | |
 |---|---|
 | 📺 **Grade de verdade** | 8 dias de programação, linha do "agora", navegação no tempo com ◀ ▶ e filtro por categoria. |
-| 🖼️ **Prévia ao vivo** | Saiu do canal? Ele continua tocando na caixinha da grade, sem recarregar e sem gastar outra conexão. |
 | 🎚️ **Qualidade inteligente** | SD/HD/FHD/4K viram um canal só. Se travar, desce sozinho (4K → FHD → HD → SD) e lembra. |
 | ▶️ **Continuar assistindo** | Filmes e episódios voltam no segundo exato. Botão "Próximo episódio" no fim e reprodução automática. |
 | 🔍 **Busca instantânea** | Busca em memória em canais, filmes e séries: 10–35 ms na TV, sem ligar para acentos. |
@@ -293,7 +291,7 @@ XC_PASS=sua_senha
 | ◀ ▶ | anda no tempo | — | −10 s / +10 s (segurar acelera) |
 | ▲ ▼ | troca de canal | troca de canal (com espera) | mostra informações |
 | OK | assiste | mostra informações | pausa / continua |
-| Voltar | agora → categorias → menu | informações → sai (mantém a prévia) | informações → sai |
+| Voltar | agora → categorias → menu | informações → sai | informações → sai |
 | 🔴 Vermelha | volta para agora | — | — |
 | 🟢 Verde | categorias | — | — |
 | 🟡 Amarela | — | painel de qualidade | — |

@@ -1,16 +1,14 @@
 // Player em tela cheia: canal ao vivo (qualidade automática) ou filme/episódio (progresso salvo).
-// O vídeo é o motor único do app (src/player/engine.ts): ao voltar de um canal para a grade,
-// ele continua tocando na caixinha de prévia em vez de fechar.
-import { createMemo, createSignal, onCleanup, onMount, Show, untrack } from 'solid-js';
+import { createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js';
 import { call } from '../data/client';
 import type { ChannelRow, Episode, PlaySource, Quality } from '../data/types';
 import { FocusZone, pushKeyHandler } from '../app/focus';
 import { fmtClock, fmtTime, t } from '../app/i18n';
 import type { KeyName } from '../app/keys';
-import { back, type Media, replace, top } from '../app/router';
+import { back, type Media, replace } from '../app/router';
 import { settings } from '../app/settings';
 import { toast } from '../app/state';
-import { adoptPreview, currentUrl, FULL, player, startPreview } from '../player/engine';
+import { FULL, player } from '../player/engine';
 import { nextFallback, pickStart, StallMonitor } from '../player/quality';
 import { OptionList, type OptionItem } from '../ui/controls';
 import { Icon } from '../ui/Icon';
@@ -83,9 +81,7 @@ export function Player(props: { media: Media }) {
     setChannelId(id);
     showOverlay();
     call('touchChannel', id);
-    // veio da prévia da grade com o mesmo canal: só volta para tela cheia
-    const adopted = adoptPreview(id);
-    setStatus(adopted ? 'playing' : 'loading');
+    setStatus('loading');
     const now = Date.now() / 1000;
     const [src, saved, r] = await Promise.all([
       call('sources', 'live', id, settings.streamFormat),
@@ -97,14 +93,6 @@ export function Player(props: { media: Media }) {
     setSources(src);
     setManual(saved);
     tried = new Set();
-    if (adopted) {
-      const i = src.findIndex((s) => s.url === currentUrl());
-      setSrcIndex(i);
-      tried.add(i);
-      monitor.reset();
-      monitor.playing();
-      return;
-    }
     playSource(pickStart(src, settings.quality, saved || learned.get(id) || null));
   }
 
@@ -401,13 +389,8 @@ export function Player(props: { media: Media }) {
     clearInterval(nextTimer);
     clearInterval(watchdog);
     clearTimeout(zapTimer);
-    // voltou de um canal para a grade: o vídeo segue na caixinha de prévia
-    const dest = untrack(top);
-    if (m.kind === 'live' && dest.name === 'live' && status() !== 'error' && currentUrl()) startPreview({ channelId: channelId(), category: m.category });
-    else {
-      player.setEvents(null);
-      player.stop();
-    }
+    player.setEvents(null);
+    player.stop();
   });
 
   // ---------- visual ----------

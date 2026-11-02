@@ -1,9 +1,7 @@
 // Motor de vídeo ÚNICO do app: AVPlay (decodificação por hardware da Samsung) na TV,
 // <video> HTML5 no navegador do Mac (só para desenvolver a interface).
 //
-// É um singleton porque o AVPlay é um só e porque o vídeo sobrevive entre telas:
-// ao voltar do player para a grade, o canal continua tocando na caixinha de prévia
-// (só muda o retângulo de exibição; nada é reaberto).
+// É um singleton porque o AVPlay é um só. A camada <object> fica fixa no App (VideoLayer).
 import { createSignal } from 'solid-js';
 
 export interface EngineEvents {
@@ -65,6 +63,7 @@ const [currentUrl, setCurrentUrl] = createSignal('');
 export { currentUrl, rect };
 
 let events: EngineEvents = noop;
+
 let opened = 0;
 let video: HTMLVideoElement | undefined;
 
@@ -191,36 +190,3 @@ export const player = {
     return video && isFinite(video.duration) ? video.duration * 1000 : 0;
   },
 };
-
-// ---------- prévia ao vivo (canal que continua na caixinha da grade) ----------
-
-export interface Preview {
-  channelId: string;
-  category: string;
-}
-
-const [preview, setPreviewSignal] = createSignal<Preview | null>(null);
-export { preview };
-
-/** O player em tela cheia sai para a grade e o canal segue tocando na caixinha. */
-export function startPreview(p: Preview) {
-  player.setEvents({ ...noop, onEnd: stopPreview, onError: stopPreview });
-  setPreviewSignal(p);
-}
-
-/** Sai da TV ao vivo / app em segundo plano: fecha o vídeo e libera a conexão. */
-export function stopPreview() {
-  if (!preview()) return;
-  setPreviewSignal(null);
-  player.stop();
-}
-
-/**
- * Player abrindo um canal: a prévia deixa de existir. Retorna true se é o mesmo canal
- * (volta para tela cheia sem reabrir o stream); senão o player só troca o stream.
- */
-export function adoptPreview(channelId: string): boolean {
-  const p = preview();
-  setPreviewSignal(null);
-  return !!p && p.channelId === channelId && !!currentUrl();
-}

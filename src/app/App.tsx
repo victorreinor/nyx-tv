@@ -4,7 +4,7 @@ import { Spinner } from '../ui/primitives';
 import { Toast } from '../ui/overlays';
 import { focusSidebar, isSidebarActive, Sidebar } from './Sidebar';
 import { VideoLayer } from '../player/VideoLayer';
-import { player, stopPreview } from '../player/engine';
+import { player } from '../player/engine';
 import { clearFocus, dispatchKey, FocusZone, focusZone, type Zone } from './focus';
 import { t } from './i18n';
 import { exitApp, keyName, registerTizenKeys } from './keys';
@@ -88,7 +88,6 @@ export function App() {
   // App foi para segundo plano (botão Home, outro app): fecha o vídeo e libera a conexão.
   const onVisibility = () => {
     if (!document.hidden) return;
-    stopPreview();
     if (top().name === 'player') back();
     player.stop();
   };
@@ -118,6 +117,8 @@ export function App() {
     on(stack, () => {
       clearFocus();
       const r = top();
+      // tela cheia: a página fica transparente e o vídeo (camada de baixo) aparece
+      document.documentElement.classList.toggle('is-playing', r.name === 'player');
       document.body.classList.toggle('is-playing', r.name === 'player');
       queueMicrotask(() => {
         const z = zones.get(r);

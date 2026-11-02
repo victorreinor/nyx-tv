@@ -71,10 +71,7 @@ Teclas no navegador: setas, Enter=OK, Esc/Backspace=Voltar, F1–F4=vermelha/ver
 - Voltar numa seção: conteúdo → menu → Início → sair (2×). Grade/Filmes/Séries interceptam antes (grade: agora → categorias).
 - `wrap` na lista em grade = ◀ ▶ passam de fileira (teclado da busca, condicional).
 
-**Vídeo.** `player` é singleton, e a camada `<object type="application/avplayer">` fica fixa no `App` (`VideoLayer`). O AVPlay "fura" a interface no retângulo do object.
-- Sair do player de um canal para a grade chama `startPreview` (o vídeo encolhe para a caixinha).
-- OK no mesmo canal chama `adoptPreview` (volta para tela cheia sem reabrir o stream).
-- Sair da seção ou o app ir para segundo plano chama `stopPreview`/`stop` (libera a conexão; a conta tem 2).
+**Vídeo.** `player` (`src/player/engine.ts`) é singleton, e a camada `<object type="application/avplayer">` fica fixa no `App` (`VideoLayer`), **sempre em tela cheia**. Sair do player ou o app ir para segundo plano chama `stop()` (libera a conexão; a conta tem 2).
 
 **Qualidade automática.** O provedor entrega cada qualidade como stream separado. `pickStart` escolhe por onde começar (salvo do canal > preferência > melhor abaixo). O `StallMonitor` decide quando trocar (não abriu em 9 s, 3 travadas por minuto ou 7 s carregando), e `nextFallback` desce primeiro e só depois sobe. A qualidade que desceu sozinha fica só na sessão.
 
@@ -101,3 +98,4 @@ Teclas no navegador: setas, Enter=OK, Esc/Backspace=Voltar, F1–F4=vermelha/ver
 - O AVPlay confirma o `seekTo` antes de voltar a tocar. O "carregando" segue até o tempo avançar depois do salto.
 - Episódio grande pode levar mais de 9 s para abrir: VOD espera 25 s e tenta de novo 1× sozinho.
 - O Vite 8 embute o CSS no `app.js` (não existe `.css` separado no build).
+- **Vídeo em janela pequena (prévia/PIP) não funciona na UN50AU7700 / Tizen 6.** O AVPlay fica em PLAYING, com o tempo andando e o retângulo certo, e mesmo assim a área fica preta. Já foram tentados: `setDisplayRect` tocando, reabrir com o retângulo antes do `prepare`, `<object>` encolhido ou em tela cheia, e página transparente com furo. Foi removido na 1.0.1. Não tente de novo sem um modelo diferente para testar.

@@ -15,7 +15,6 @@ Primeira versão.
 - Canais SD/HD/FHD/4K agrupados em um só, com seletor de qualidade
 - Qualidade automática: desce de 4K → FHD → HD → SD quando o canal trava
 - Grade de programação (XMLTV) limpa de duplicatas, com linha do "agora"
-- Prévia ao vivo: ao voltar de um canal, ele continua tocando na caixinha da grade
 - Continuar assistindo (episódio e segundo exatos) e próximo episódio automático
 - Botão "Próximo episódio" no fim do episódio (tempo ajustável)
 - Abas "Continuar assistindo" e "Assistidos" em Filmes e Séries; capas mostram "T2 E5" e "Visto"
@@ -28,6 +27,5 @@ Primeira versão.
 ### Correções
 - Envio de objetos reativos ao worker ("nenhuma lista aberta")
 - Grade sem programação depois de navegar para dias sem dados
-- Prévia aparecia preta (medida com a tela ainda escondida)
 - Episódios que falhavam na primeira tentativa (agora espera mais e tenta de novo sozinho)
 - Teclado da busca: setas passam de fileira e chegam em Espaço/Apagar/Limpar

@@ -7,7 +7,7 @@ Ordem = valor para quem assiste ÷ esforço. Cada item diz o porquê em uma linh
 - [x] Diagnóstico do motor da TV (Tizen 6 / Chromium 76): mediu WebSQL, IndexedDB, workers e busca
 - [x] Camada de dados em Web Worker: Xtream/M3U, cache em blocos no IndexedDB, busca em memória, paginação keyset
 - [x] Canais SD/HD/FHD/4K agrupados em um só, com seletor de qualidade e troca automática quando trava
-- [x] Grade de programação (XMLTV) limpa de duplicatas; prévia ao vivo na grade
+- [x] Grade de programação (XMLTV) limpa de duplicatas
 - [x] Telas: Início, TV ao vivo, Filmes, Séries, detalhes, Busca, Favoritos, Configurações
 - [x] Continuar assistindo (episódio e segundo), botão e reprodução automática do próximo episódio
 - [x] Abas "Continuar assistindo" e "Assistidos"; capas com "T2 E5"/"Visto"; limpar histórico
@@ -20,7 +20,6 @@ Ordem = valor para quem assiste ÷ esforço. Cada item diz o porquê em uma linh
 - [ ] **Mini-grade no player**: ver e trocar de canal sem sair da tela cheia.
 - [ ] **Timer para dormir**: desligar o vídeo em 15/30/60/90 min. Combina com o uso à noite.
 - [ ] **Faixas de áudio e legenda** no player (dublado/legendado), pelas APIs de faixa do AVPlay.
-- [ ] **Prévia ao passar pela grade**: além da prévia do canal que você estava vendo (pronta), tocar o canal focado depois de 1,5 s parado. Usa 1 das 2 conexões.
 - [ ] **"Agora na TV"** na Início: filmes e jogos que estão começando, tirados da grade.
 - [ ] **Novos episódios**: selo nas séries favoritas quando o provedor adicionar episódio.
 
@@ -44,6 +43,8 @@ Ordem = valor para quem assiste ÷ esforço. Cada item diz o porquê em uma linh
 - [ ] **Acessibilidade**: modo texto grande e alto contraste.
 
 ## Ideias para avaliar
+
+- **Prévia ao vivo na grade (vídeo na caixinha)**: tentada e removida na 1.0.1. Na UN50AU7700 o vídeo em janela pequena fica preto (detalhes no CLAUDE.md). Só vale retomar com outro modelo de TV para testar.
 
 - **Catch-up / voltar no tempo**: depende de canais com `tv_archive`. A lista atual tem 0, então só vale se o provedor mudar.
 - **Várias listas juntas**: ver duas listas como um catálogo só.
