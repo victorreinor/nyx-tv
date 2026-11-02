@@ -30,6 +30,8 @@ const VOD_STARTUP_MS = 25000;
 const ZAP_MS = 700;
 /** Filme/episódio carregando no meio da reprodução por mais que isso: mostra erro com "tentar de novo". */
 const VOD_STALL_S = 30;
+/** "Tocando" mas o tempo parado por isso: o vídeo travou em silêncio (comum em 4K com servidor lento). */
+const SILENT_STALL_MS = 4000;
 
 export function Player(props: { media: Media }) {
   const m = props.media;
@@ -51,6 +53,9 @@ export function Player(props: { media: Media }) {
   /** Destino do último salto enquanto o vídeo ainda não voltou a andar (filme/episódio). */
   const [landing, setLanding] = createSignal<number | null>(null);
   let lastBusyToast = 0;
+  /** Último instante em que o tempo do vídeo andou de verdade. */
+  let lastAdvanceAt = 0;
+  let lastMs = 0;
   let waitTimer: ReturnType<typeof setInterval> | undefined;
   createEffect(
     on(status, (st) => {
@@ -284,6 +289,7 @@ export function Player(props: { media: Media }) {
     }
     if (!src[0]) return setStatus('error');
     vodOpenedAt = Date.now();
+    lastAdvanceAt = Date.now();
     audioChecked = false;
     clearTimeout(audioTimer);
     player.open(src[0].url, startSec * 1000).catch(() => retryVod());
@@ -344,6 +350,7 @@ export function Player(props: { media: Media }) {
       seeking = false;
       // pausado não anda: não fica preso no carregando
       awaitingAdvance = !paused();
+      lastAdvanceAt = Date.now();
       if (paused()) {
         setStatus('playing');
         setLanding(null);
@@ -352,6 +359,7 @@ export function Player(props: { media: Media }) {
   }
 
   function togglePause() {
+    lastAdvanceAt = Date.now();
     if (paused()) player.play();
     else player.pause();
     setPaused(!paused());
@@ -459,6 +467,10 @@ export function Player(props: { media: Media }) {
           awaitingAdvance = false;
           setLanding(null);
         }
+        if (Math.abs(ms - lastMs) > 200) {
+          lastMs = ms;
+          lastAdvanceAt = Date.now();
+        }
         setPos(ms);
         if (status() !== 'playing') {
           setStatus('playing');
@@ -480,6 +492,10 @@ export function Player(props: { media: Media }) {
       if (m.kind !== 'live') {
         if (status() === 'loading' && !awaitingAdvance && vodOpenedAt && Date.now() - vodOpenedAt > VOD_STARTUP_MS) retryVod();
         else if ((status() === 'buffering' || landing() !== null) && waitSec() > VOD_STALL_S) setStatus('error');
+        else if (status() === 'playing' && !paused() && seekTarget() === null && lastAdvanceAt && Date.now() - lastAdvanceAt > SILENT_STALL_MS) {
+          // diz que toca, mas o tempo não anda: mostra que está carregando (e o limite de 30 s vale)
+          setStatus('buffering');
+        }
         return;
       }
       const v = monitor.verdict();
