@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-1.1.0-8e7bff?style=flat-square">
+  <img alt="version" src="https://img.shields.io/badge/version-1.1.1-8e7bff?style=flat-square">
   <img alt="Samsung Tizen" src="https://img.shields.io/badge/Samsung%20Tizen-6.0%2B-1428a0?style=flat-square">
   <img alt="SolidJS" src="https://img.shields.io/badge/SolidJS-1.9-2c4f7c?style=flat-square">
   <img alt="Bun" src="https://img.shields.io/badge/Bun-1.3-fbf0df?style=flat-square&labelColor=14151a">
