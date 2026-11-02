@@ -4,6 +4,14 @@ Versões seguem [SemVer](https://semver.org/lang/pt-BR/): **correção** sobe o 
 **funcionalidade** sobe o do meio (1.1.0), **mudança grande** sobe o primeiro (2.0.0).
 Gerado por `bun run release patch|minor|major`.
 
+## [1.3.0] — 2026-11-02
+
+### Novidades
+- TMDB à prova de falhas, busca com abas e selos de versão
+
+### Outros
+- chore: tira worktree de outra sessão que entrou por engano e ignora .claude/worktrees
+
 ## [1.2.0] — 2026-11-02
 
 ### Novidades
