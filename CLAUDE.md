@@ -19,6 +19,7 @@ Produto/visão: [README.md](README.md) · próximos passos: [ROADMAP.md](ROADMAP
 | `bun run report` | recebe logs/erros/memória da TV (build com `--report`) em `tools/.reports/nyx.jsonl` |
 | `bun scripts/shot.ts <pasta> [teclas…]` | Chrome headless: aperta teclas e salva capturas (`URL`, `SHOT_PROFILE`, `WAIT_MS`) |
 | `bun run release patch\|minor\|major` | sobe versão, escreve CHANGELOG, commit + tag (depois `git push --follow-tags`) |
+| `bun run wgt` | `.build/release/nyx.wgt` **sem assinatura** (o que vai para o release do GitHub; o instalador de celular/PC assina para a TV de quem instala) |
 
 Teclas no navegador: setas, Enter=OK, Esc/Backspace=Voltar, F1–F4=vermelha/verde/amarela/azul, PageUp/Down=CH▲▼.
 
@@ -87,7 +88,7 @@ Teclas no navegador: setas, Enter=OK, Esc/Backspace=Voltar, F1–F4=vermelha/ver
 - **Consulta nova no worker:** método em `api` (`worker.ts`), lógica em `catalog.ts` se mexe no catálogo. A UI chama `call('método', …)` (já tipado). Teste puro em `tests/` se tiver regra.
 - **Configuração nova:** campo + padrão em `settings.ts`, painel em `screens/Settings.tsx`, textos.
 - **Componente visual:** em `src/ui/`, só visual. O foco vem de quem usa (`focused` / `useList`). Cores e medidas dos tokens de `tokens.css`.
-- **Lançar versão:** `bun run check` → commit → `bun run release patch|minor|major` → `git push --follow-tags`.
+- **Lançar versão:** `bun run check` → commit → `bun run release patch|minor|major` → `git push --follow-tags`. A tag dispara `.github/workflows/release.yml`, que cria o release com o `nyx.wgt` (é de lá que Apps2Samsung/TV Installer baixam). Nunca anexe o `.wgt` do `tv.sh`: ele leva o seu certificado.
 
 ## Testar
 

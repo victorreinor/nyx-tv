@@ -1,0 +1,39 @@
+# Cada tag vX.Y.Z (bun run release + git push --follow-tags) vira um release no
+# GitHub com o nyx.wgt anexado. É de lá que os instaladores de celular e PC
+# (Apps2Samsung, TV Installer…) baixam o Nyx.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  wgt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck && bun test
+      - run: bun run wgt
+      - name: Publica o release com o nyx.wgt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#v}"
+          PKG="$(bun -e 'console.log(require("./package.json").version)')"
+          [ "$PKG" = "$VERSION" ] || { echo "a tag $TAG não bate com o package.json ($PKG)"; exit 1; }
+          # notas = a seção desta versão no CHANGELOG
+          awk -v h="## [$VERSION]" 'index($0, h) == 1 { on = 1; next } /^## \[/ { on = 0 } on' CHANGELOG.md > notes.md
+          printf '\n---\n📲 Como instalar na TV: https://github.com/%s/blob/main/docs/INSTALAR.md\n' "$GITHUB_REPOSITORY" >> notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" .build/release/nyx.wgt --clobber
+          else
+            gh release create "$TAG" .build/release/nyx.wgt --title "Nyx $VERSION" --notes-file notes.md --verify-tag
+          fi

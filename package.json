@@ -11,6 +11,7 @@
     "tv": "./scripts/tv.sh",
     "report": "bun tools/report-server.ts",
     "release": "bun scripts/release.ts",
+    "wgt": "bun scripts/wgt.ts",
     "check": "bun run typecheck && bun test && bun run build && bun scripts/check-compat.ts",
     "demo": "bun tools/demo-server.ts"
   },

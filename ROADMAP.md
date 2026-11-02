@@ -51,7 +51,8 @@ Ordem = valor para quem assiste ÷ esforço. Cada entrega vira uma versão (SemV
 ## 2.0 — distribuição e manutenção
 
 - [ ] **Atualização sem cabo**: o GitHub Actions publica cada versão no GitHub Pages (`victorreinor.github.io/nyx-tv`, gratuito). A TV baixa a versão nova em segundo plano e usa na próxima abertura, com verificação por hash e volta automática se a nova travar.
-- [ ] **CI**: testes, tipos e checagem do Chrome 76 a cada envio; `.wgt` assinado anexado a cada release.
+- [x] **`.wgt` em cada release**: a tag vira release no GitHub com o `nyx.wgt`, que os instaladores de celular/PC baixam. Vai sem assinatura: o instalador assina para a TV de quem instala.
+- [ ] **CI**: testes, tipos e checagem do Chrome 76 a cada envio (hoje só rodam na tag).
 - [ ] **Backup do usuário**: exportar/importar favoritos e progresso (QR code ou arquivo).
 - [ ] **Relatório de erros** opcional (Sentry), para ver travamentos que acontecem na TV.
 - [ ] **Medidor de desempenho** em modo dev: FPS e tempo de cada tela, para pegar regressões.

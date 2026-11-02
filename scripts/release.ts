@@ -1,5 +1,6 @@
 // Nova versão: sobe o número, escreve o CHANGELOG com os commits desde a última tag,
 // faz o commit "release: vX.Y.Z" e cria a tag. Depois: git push --follow-tags
+// (o GitHub Actions cria o release com o nyx.wgt, ver .github/workflows/release.yml)
 //
 //   bun run release patch   1.0.0 → 1.0.1   correção
 //   bun run release minor   1.0.1 → 1.1.0   funcionalidade nova
@@ -51,4 +52,4 @@ writeFileSync('README.md', readme);
 await $`git add package.json CHANGELOG.md tizen/config.xml README.md`;
 await $`git commit -q -m ${`release: v${next}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`}`;
 await $`git tag -a ${'v' + next} -m ${'Nyx ' + next}`;
-console.log(`v${next} pronta. Publique com: git push --follow-tags`);
+console.log(`v${next} pronta. Publique com: git push --follow-tags (o GitHub cria o release com o nyx.wgt)`);
