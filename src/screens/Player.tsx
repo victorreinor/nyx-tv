@@ -4,7 +4,7 @@ import { call } from '../data/client';
 import type { ChannelRow, Episode, PlaySource, Quality } from '../data/types';
 import { FocusZone, pushKeyHandler, trapCount } from '../app/focus';
 import { fmtClock, fmtTime, type MessageKey, t } from '../app/i18n';
-import type { KeyName } from '../app/keys';
+import { keyName, type KeyName } from '../app/keys';
 import { back, type Media, replace } from '../app/router';
 import { settings } from '../app/settings';
 import { setLastChannel, toast } from '../app/state';
@@ -32,6 +32,7 @@ const ZAP_MS = 700;
 const VOD_STALL_S = 30;
 /** "Tocando" mas o tempo parado por isso: o vídeo travou em silêncio (comum em 4K com servidor lento). */
 const SILENT_STALL_MS = 4000;
+const ADVANCE_MS = 1000;
 
 export function Player(props: { media: Media }) {
   const m = props.media;
@@ -84,9 +85,12 @@ export function Player(props: { media: Media }) {
   const episode = (): Episode | null => (m.kind === 'episode' ? m.episodes[epIndex()] || null : null);
   let lastSave = 0;
   let seeking = false; // entre o salto e o vídeo voltar a andar
-  let awaitingAdvance = false; // salto feito; carregando até o tempo andar de verdade
-  let seekLanded = 0;
-  let seekCommittedAt = 0;
+  /**
+   * Filme/episódio: depois de abrir, saltar ou travar, só volta a "tocando" quando o tempo
+   * andar ADVANCE_MS a partir do primeiro instante informado (resumeRef). Evita o pisca-pisca
+   * do "carregando" com o AVPlay mandando o tempo em rajadas.
+   */
+  let resumeRef: number | null = null;
   let seekSteps = 0; // segurar a seta acelera os saltos
   let vodOpenedAt = 0;
   let vodRetries = 0;
@@ -290,6 +294,7 @@ export function Player(props: { media: Media }) {
     if (!src[0]) return setStatus('error');
     vodOpenedAt = Date.now();
     lastAdvanceAt = Date.now();
+    resumeRef = null;
     audioChecked = false;
     clearTimeout(audioTimer);
     player.open(src[0].url, startSec * 1000).catch(() => retryVod());
@@ -329,7 +334,7 @@ export function Player(props: { media: Media }) {
     replace({ name: 'player', media: { ...m, index: i, position: 0 } });
   }
 
-  /** Acumula os saltos enquanto a seta é segurada; só busca no vídeo quando solta. */
+  /** Acumula os saltos enquanto a seta é segurada; aplica quando solta (keyup) ou depois de 0,7 s parada. */
   function seekBy(direction: 1 | -1, base: number) {
     seekSteps++;
     const step = seekSteps > 40 ? 120 : seekSteps > 20 ? 60 : seekSteps > 8 ? 30 : base;
@@ -337,25 +342,35 @@ export function Player(props: { media: Media }) {
     const target = Math.max(0, Math.min(dur() ? dur() - 2000 : Infinity, from + direction * step * 1000));
     setSeekTarget(target);
     clearTimeout(seekTimer);
-    seekTimer = setTimeout(async () => {
-      seekSteps = 0;
-      seeking = true;
-      seekLanded = target;
-      seekCommittedAt = Date.now();
-      setPos(target);
-      setSeekTarget(null);
-      setLanding(target);
-      setStatus('loading');
-      await player.seek(target);
-      seeking = false;
-      // pausado não anda: não fica preso no carregando
-      awaitingAdvance = !paused();
-      lastAdvanceAt = Date.now();
-      if (paused()) {
-        setStatus('playing');
-        setLanding(null);
-      }
-    }, SEEK_COMMIT_MS);
+    seekTimer = setTimeout(commitSeek, SEEK_COMMIT_MS);
+  }
+
+  /**
+   * Aplica o salto: troca o quadradinho por "Indo para…" NA HORA, deixa a TV desenhar isso,
+   * e só então chama o AVPlay (o seekTo pode segurar a TV em arquivo 4K lento).
+   */
+  function commitSeek() {
+    clearTimeout(seekTimer);
+    const target = seekTarget();
+    if (target === null) return;
+    seekSteps = 0;
+    seeking = true;
+    resumeRef = null;
+    setPos(target);
+    setSeekTarget(null);
+    setLanding(target);
+    setStatus('loading');
+    requestAnimationFrame(() =>
+      setTimeout(async () => {
+        await player.seek(target);
+        seeking = false;
+        lastAdvanceAt = Date.now();
+        if (paused()) {
+          setStatus('playing');
+          setLanding(null);
+        }
+      }, 50),
+    );
   }
 
   function togglePause() {
@@ -399,7 +414,6 @@ export function Player(props: { media: Media }) {
       else {
         const at = landing() !== null ? landing()! : pos();
         setLanding(null);
-        awaitingAdvance = false;
         openVod(at / 1000);
       }
       return true;
@@ -438,15 +452,23 @@ export function Player(props: { media: Media }) {
     player.setRect(FULL);
     player.setEvents({
       onBuffering: () => {
+        if (m.kind !== 'live') {
+          // filme: só muda para carregando se estava tocando (e aí exige andar de novo)
+          if (status() === 'playing' && !paused()) {
+            resumeRef = null;
+            setStatus('buffering');
+          }
+          return;
+        }
         setStatus('buffering');
         monitor.buffering();
       },
       onPlaying: () => {
-        if (seeking || awaitingAdvance) return;
-        setStatus('playing');
-        vodRetries = 0;
-        monitor.playing();
         setDur(player.duration());
+        if (m.kind === 'live') {
+          setStatus('playing');
+          monitor.playing();
+        }
         if (!audioChecked) {
           clearTimeout(audioTimer);
           audioTimer = setTimeout(autoAudio, 2000);
@@ -455,28 +477,33 @@ export function Player(props: { media: Media }) {
       onSubtitle: (text, durationMs) => {
         setSubtitle(text.replace(/<[^>]+>/g, ''));
         clearTimeout(subTimer);
-    clearTimeout(audioTimer);
-    clearInterval(waitTimer);
         subTimer = setTimeout(() => setSubtitle(''), Math.max(800, durationMs || 3000));
       },
       onTime: (ms) => {
         if (seeking || seekTarget() !== null) return;
-        if (awaitingAdvance) {
-          // ainda no ponto do salto (ou rápido demais para notar): segue carregando
-          if (ms < seekLanded + 400 || Date.now() - seekCommittedAt < 700) return;
-          awaitingAdvance = false;
-          setLanding(null);
-        }
         if (Math.abs(ms - lastMs) > 200) {
           lastMs = ms;
           lastAdvanceAt = Date.now();
         }
-        setPos(ms);
+        if (m.kind === 'live') {
+          setPos(ms);
+          if (status() !== 'playing') {
+            setStatus('playing');
+            monitor.playing();
+            showOverlay();
+          }
+          return;
+        }
         if (status() !== 'playing') {
+          // só sai do "carregando" depois de andar 1 s de verdade a partir de onde parou
+          if (resumeRef === null) resumeRef = ms;
+          if (ms < resumeRef + ADVANCE_MS) return;
           setStatus('playing');
-          monitor.playing();
+          setLanding(null);
+          vodRetries = 0;
           showOverlay();
         }
+        setPos(ms);
         if (!dur()) setDur(player.duration());
         saveProgress();
       },
@@ -485,15 +512,22 @@ export function Player(props: { media: Media }) {
     });
     const pop = pushKeyHandler(onKey);
     onCleanup(pop);
+    const onKeyUp = (e: KeyboardEvent) => {
+      const k = keyName(e);
+      if (seekTarget() !== null && (k === 'left' || k === 'right' || k === 'rw' || k === 'ff')) commitSeek();
+    };
+    document.addEventListener('keyup', onKeyUp, true);
+    onCleanup(() => document.removeEventListener('keyup', onKeyUp, true));
     if (m.kind === 'live') openChannel(m.channelId);
     else openVod(m.position || 0);
     watchdog = setInterval(() => {
       if (status() === 'error' || seeking) return;
       if (m.kind !== 'live') {
-        if (status() === 'loading' && !awaitingAdvance && vodOpenedAt && Date.now() - vodOpenedAt > VOD_STARTUP_MS) retryVod();
-        else if ((status() === 'buffering' || landing() !== null) && waitSec() > VOD_STALL_S) setStatus('error');
+        if (status() === 'loading' && landing() === null && vodOpenedAt && Date.now() - vodOpenedAt > VOD_STARTUP_MS) retryVod();
+        else if (status() !== 'playing' && (status() === 'buffering' || landing() !== null) && waitSec() > VOD_STALL_S) setStatus('error');
         else if (status() === 'playing' && !paused() && seekTarget() === null && lastAdvanceAt && Date.now() - lastAdvanceAt > SILENT_STALL_MS) {
           // diz que toca, mas o tempo não anda: mostra que está carregando (e o limite de 30 s vale)
+          resumeRef = null;
           setStatus('buffering');
         }
         return;
