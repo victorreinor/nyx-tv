@@ -5,3 +5,6 @@ dist/
 tools/.reports/
 *.wgt
 .DS_Store
+
+# worktrees de outras sessões do Claude Code
+.claude/worktrees/
