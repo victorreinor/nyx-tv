@@ -44,7 +44,11 @@ writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
 const xml = readFileSync('tizen/config.xml', 'utf8').replace(/ version="[0-9.]+" viewmodes/, ` version="${next}" viewmodes`);
 writeFileSync('tizen/config.xml', xml);
 
-await $`git add package.json CHANGELOG.md tizen/config.xml`;
+// selo de versão do README
+const readme = readFileSync('README.md', 'utf8').replace(/badge\/version-[0-9.]+-/, `badge/version-${next}-`);
+writeFileSync('README.md', readme);
+
+await $`git add package.json CHANGELOG.md tizen/config.xml README.md`;
 await $`git commit -q -m ${`release: v${next}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`}`;
 await $`git tag -a ${'v' + next} -m ${'Nyx ' + next}`;
 console.log(`v${next} pronta. Publique com: git push --follow-tags`);
