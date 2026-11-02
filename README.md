@@ -61,6 +61,17 @@ searches 40 thousand titles while you type.
 
 <sub>Screenshots use the fictional demo server (<code>bun run demo</code>). Every title, channel and poster in them is made up.</sub>
 
+## 📲 Install on your TV
+
+Nyx is not in the Samsung store. You install it **once** with [Apps2Samsung](https://github.com/Apps2Samsung/Apps2Samsung),
+a free community app for Android or computer that sends Nyx to the TV over Wi‑Fi. No Tizen Studio.
+
+1. Install **Apps2Samsung** on your phone or computer.
+2. On the TV: *Apps* → type `12345` → *Developer mode* on → *Host PC IP* = the phone’s/computer’s IP → restart the TV.
+3. In Apps2Samsung: pick your TV → **Nyx** (*IPTV & Live TV*) → **Install**.
+
+👉 **[Step-by-step guide, updates and troubleshooting](docs/INSTALL.md)**
+
 ## ⚡ Measured on a real TV
 
 Every architecture decision came from benchmarks on a **Samsung UN50AU7700** (2021, Tizen 6.0, ARMv7, 2 GB, Chromium 76).
@@ -115,7 +126,7 @@ bun run dev           # app on http://localhost:5173
 Add a playlist in the app: server `http://localhost:8790`, user `demo`, password `demo`.
 On the keyboard, arrows navigate, Enter is OK, Esc is Back, and F1–F4 are the red/green/yellow/blue keys.
 
-### 2. Install on your TV
+### 2. Build and install on your TV
 
 ```bash
 # one time: signing certificate + profile
@@ -178,6 +189,7 @@ tools/        demo server, TV diagnostic, log receiver
 
 [SemVer](https://semver.org): fix → `1.0.1`, feature → `1.1.0`, breaking → `2.0.0`.
 The version lives only in `package.json` and is injected into the app and the TV package. See [CHANGELOG](CHANGELOG.md) and [ROADMAP](ROADMAP.md).
+Every tag pushed to GitHub becomes a [release](https://github.com/victorreinor/nyx-tv/releases) with `nyx.wgt` attached (`.github/workflows/release.yml`), which is what the installers download.
 
 ## 🤝 Contributing
 
@@ -224,6 +236,17 @@ junta as versões SD/HD/FHD/4K do mesmo canal, lembra exatamente onde você paro
 | 🔒 **PIN para adultos** | Categorias adultas escondidas por padrão (PIN `0000`, dá para trocar). |
 | 🎨 **Design system próprio** | Paleta noturna, Manrope, foco com anel e escala, zero desfoque e zero sombra pesada. |
 
+## 📲 Instalar na sua TV
+
+O Nyx não está na loja da Samsung. Você instala **uma vez** com o [Apps2Samsung](https://github.com/Apps2Samsung/Apps2Samsung),
+um app gratuito da comunidade, para Android ou computador, que manda o Nyx para a TV pelo Wi‑Fi. Sem Tizen Studio.
+
+1. Instale o **Apps2Samsung** no celular ou no computador.
+2. Na TV: *Apps* → digite `12345` → ligue o *Modo desenvolvedor* → *IP do PC host* = IP do celular/computador → reinicie a TV.
+3. No Apps2Samsung: escolha a TV → **Nyx** (*IPTV & Live TV*) → **Instalar**.
+
+👉 **[Passo a passo, atualização e problemas comuns](docs/INSTALAR.md)**
+
 ## ⚡ Medido numa TV de verdade
 
 Cada decisão de arquitetura saiu de testes numa **Samsung UN50AU7700** (2021, Tizen 6.0, ARMv7, 2 GB, Chromium 76).
@@ -264,7 +287,7 @@ bun run dev           # app em http://localhost:5173
 No app, adicione a lista: servidor `http://localhost:8790`, usuário `demo`, senha `demo`.
 No teclado, as setas navegam, Enter é OK, Esc é Voltar e F1–F4 são as teclas vermelha/verde/amarela/azul.
 
-### 2. Instale na sua TV
+### 2. Compile e instale na sua TV
 
 ```bash
 # uma vez: certificado de assinatura + perfil
@@ -304,7 +327,8 @@ XC_PASS=sua_senha
 ## 🏷️ Versões
 
 [SemVer](https://semver.org/lang/pt-BR/): correção → `1.0.1`, funcionalidade → `1.1.0`, mudança grande → `2.0.0`.
-A versão fica só no `package.json` e vai para o app e para o pacote da TV. Para lançar uma: `bun run release patch|minor|major`.
+A versão fica só no `package.json` e vai para o app e para o pacote da TV. Para lançar uma: `bun run release patch|minor|major` e `git push --follow-tags`.
+Cada tag enviada vira um [release](https://github.com/victorreinor/nyx-tv/releases) com o `nyx.wgt` anexado (`.github/workflows/release.yml`), que é o que os instaladores baixam.
 Veja o [CHANGELOG](CHANGELOG.md) e o [ROADMAP](ROADMAP.md).
 
 ## 🤝 Contribuindo
