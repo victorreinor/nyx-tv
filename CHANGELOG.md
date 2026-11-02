@@ -4,6 +4,14 @@ Versões seguem [SemVer](https://semver.org/lang/pt-BR/): **correção** sobe o 
 **funcionalidade** sobe o do meio (1.1.0), **mudança grande** sobe o primeiro (2.0.0).
 Gerado por `bun run release patch|minor|major`.
 
+## [1.0.2] — 2026-11-02
+
+### Correções
+- Voltar na grade volta para a hora atual e para o canal que estava tocando
+
+### Outros
+- chore: selo de versão do README acompanha o release
+
 ## [1.0.1] — 2026-11-02
 
 ### Correções
