@@ -4,6 +4,11 @@ Versões seguem [SemVer](https://semver.org/lang/pt-BR/): **correção** sobe o 
 **funcionalidade** sobe o do meio (1.1.0), **mudança grande** sobe o primeiro (2.0.0).
 Gerado por `bun run release patch|minor|major`.
 
+## [1.1.4] — 2026-11-02
+
+### Correções
+- feedback e controles bloqueados enquanto filme/episódio carrega ou volta de um salto
+
 ## [1.1.3] — 2026-11-02
 
 ### Correções
