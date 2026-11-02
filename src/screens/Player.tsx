@@ -46,6 +46,7 @@ export function Player(props: { media: Media }) {
   const [guide, setGuide] = createSignal<{ rows: ChannelRow[]; index: number } | null>(null);
   let subTimer: ReturnType<typeof setTimeout> | undefined;
   let audioChecked = false; // escolha automática do áudio: uma vez por stream aberto
+  let audioTimer: ReturnType<typeof setTimeout> | undefined;
 
   // ao vivo
   const [channelId, setChannelId] = createSignal(m.kind === 'live' ? m.channelId : '');
@@ -114,6 +115,7 @@ export function Player(props: { media: Media }) {
     setStatus('loading');
     monitor.reset();
     audioChecked = false;
+    clearTimeout(audioTimer);
     player.open(sources()[i].url).catch(() => fallback());
   }
 
@@ -266,6 +268,7 @@ export function Player(props: { media: Media }) {
     if (!src[0]) return setStatus('error');
     vodOpenedAt = Date.now();
     audioChecked = false;
+    clearTimeout(audioTimer);
     player.open(src[0].url, startSec * 1000).catch(() => retryVod());
   }
 
@@ -401,11 +404,15 @@ export function Player(props: { media: Media }) {
         vodRetries = 0;
         monitor.playing();
         setDur(player.duration());
-        if (!audioChecked) setTimeout(autoAudio, 2000);
+        if (!audioChecked) {
+          clearTimeout(audioTimer);
+          audioTimer = setTimeout(autoAudio, 2000);
+        }
       },
       onSubtitle: (text, durationMs) => {
         setSubtitle(text.replace(/<[^>]+>/g, ''));
         clearTimeout(subTimer);
+    clearTimeout(audioTimer);
         subTimer = setTimeout(() => setSubtitle(''), Math.max(800, durationMs || 3000));
       },
       onTime: (ms) => {
@@ -451,6 +458,7 @@ export function Player(props: { media: Media }) {
     clearInterval(watchdog);
     clearTimeout(zapTimer);
     clearTimeout(subTimer);
+    clearTimeout(audioTimer);
     player.setEvents(null);
     player.stop();
   });
