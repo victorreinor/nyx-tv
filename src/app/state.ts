@@ -5,6 +5,8 @@ import type { Stats, SyncPhase } from '../data/types';
 import { activePlaylist, filters } from './settings';
 
 export const [dataVersion, setDataVersion] = createSignal(0);
+/** Último canal sintonizado no player (a grade volta para ele no Voltar). */
+export const [lastChannel, setLastChannel] = createSignal<string | null>(null);
 export const [stats, setStats] = createSignal<Stats | null>(null);
 export const [sync, setSync] = createSignal<{ running: boolean; phase: SyncPhase; pct: number; error: string }>({
   running: false,

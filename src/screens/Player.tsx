@@ -7,7 +7,7 @@ import { fmtClock, fmtTime, t } from '../app/i18n';
 import type { KeyName } from '../app/keys';
 import { back, type Media, replace } from '../app/router';
 import { settings } from '../app/settings';
-import { toast } from '../app/state';
+import { setLastChannel, toast } from '../app/state';
 import { FULL, player } from '../player/engine';
 import { nextFallback, pickStart, StallMonitor } from '../player/quality';
 import { OptionList, type OptionItem } from '../ui/controls';
@@ -79,6 +79,7 @@ export function Player(props: { media: Media }) {
 
   async function openChannel(id: string) {
     setChannelId(id);
+    setLastChannel(id);
     showOverlay();
     call('touchChannel', id);
     setStatus('loading');

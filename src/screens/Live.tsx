@@ -6,7 +6,7 @@ import { FocusZone, type ListHandle } from '../app/focus';
 import { fmtDay, fmtTime, t } from '../app/i18n';
 import { playChannel } from '../app/play';
 import { usePaged } from '../app/paged';
-import { dataVersion, stats, toast } from '../app/state';
+import { dataVersion, lastChannel, stats, toast } from '../app/state';
 import { top } from '../app/router';
 import { ChipRow, type ChipItem } from '../ui/controls';
 import { Img, LiveBadge, QualityBadges, ColorKeys } from '../ui/primitives';
@@ -51,9 +51,31 @@ export function Live() {
     () => [category(), range(), dataVersion()],
   );
 
-  // Voltou do player para a grade: ela volta para "agora".
+  // Voltou do player para a grade: volta para "agora" e para o canal que estava tocando.
   const isTop = () => top().name === 'live';
-  createEffect(on(isTop, (visible, was) => visible && was === false && untrack(goNow)));
+  createEffect(on(isTop, (visible, was) => visible && was === false && untrack(backToPlaying)));
+
+  /** Índice (na lista carregada) do canal que estava tocando, ou -1. */
+  function playingIndex(): number {
+    const id = lastChannel();
+    return id ? rows.items().findIndex((r) => r.id === id) : -1;
+  }
+
+  /** Grade de volta para "agora" e foco no canal que estava tocando. */
+  function backToPlaying(): boolean {
+    let moved = false;
+    if (Math.abs(cursor() - nowSec()) > STEP || winStart() !== floorHalfHour(nowSec())) {
+      goNow();
+      moved = true;
+    }
+    const g = grid();
+    const i = playingIndex();
+    if (g && i !== -1 && g.index() !== i) {
+      g.focus(i);
+      moved = true;
+    }
+    return moved;
+  }
 
   const focusedRow = () => {
     const g = grid();
@@ -86,11 +108,8 @@ export function Live() {
 
   function onGridKey(k: string, row: ChannelRow): boolean {
     if (k === 'back') {
-      // longe do horário atual: o primeiro Voltar traz a grade para "agora"
-      if (Math.abs(cursor() - nowSec()) > STEP || winStart() !== floorHalfHour(nowSec())) {
-        goNow();
-        return true;
-      }
+      // 1º Voltar: hora atual + canal que estava tocando; 2º: categorias; 3º: menu
+      if (backToPlaying()) return true;
       const c = chips();
       if (c) c.focus(Math.max(0, chipItems().findIndex((x) => x.id === category())));
       return true;
