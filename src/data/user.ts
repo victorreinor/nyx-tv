@@ -20,12 +20,15 @@ export class UserStore {
   state: UserState = empty();
   private pid = '';
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** Último progresso de cada série (para a capa mostrar "T2 E5"). Refeito quando o progresso muda. */
+  private seriesIndex: Map<number, Progress> | null = null;
 
   async load(pid: string) {
     this.flush();
     this.pid = pid;
     const saved = await loadRecord<UserState>('user', pid);
     this.state = { ...empty(), ...(saved || {}) };
+    this.seriesIndex = null;
   }
 
   private persist() {
@@ -61,6 +64,35 @@ export class UserStore {
 
   saveProgress(p: Progress) {
     this.state.progress[p.key] = p;
+    this.seriesIndex = null;
+    this.persist();
+  }
+
+  latestForSeries(seriesId: number): Progress | undefined {
+    if (!this.seriesIndex) {
+      const map = new Map<number, Progress>();
+      const all = this.state.progress;
+      for (const k in all) {
+        const p = all[k];
+        if (!p.seriesId) continue;
+        const cur = map.get(p.seriesId);
+        if (!cur || p.updatedAt > cur.updatedAt) map.set(p.seriesId, p);
+      }
+      this.seriesIndex = map;
+    }
+    return this.seriesIndex.get(seriesId);
+  }
+
+  /** Configurações › Histórico. Favoritos nunca são apagados aqui. */
+  clearProgress(kind: 'movie' | 'episode' | 'all') {
+    const all = this.state.progress;
+    for (const k in all) if (kind === 'all' || all[k].kind === kind) delete all[k];
+    this.seriesIndex = null;
+    this.persist();
+  }
+
+  clearRecentChannels() {
+    this.state.recentChannels = [];
     this.persist();
   }
 

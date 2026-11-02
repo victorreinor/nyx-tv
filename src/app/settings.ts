@@ -12,6 +12,8 @@ export interface Settings {
   quality: QualityPref;
   autoQuality: boolean;
   streamFormat: 'ts' | 'm3u8';
+  /** Segundos antes do fim em que aparece o botão "Próximo episódio" (0 = desligado). */
+  nextEpisodeAt: number;
   playlists: PlaylistConfig[];
   activePlaylist: string | null;
   recentSearches: string[];
@@ -34,6 +36,7 @@ const defaults: Settings = {
   quality: 'FHD',
   autoQuality: true,
   streamFormat: 'ts',
+  nextEpisodeAt: 60,
   playlists: [],
   activePlaylist: null,
   recentSearches: [],

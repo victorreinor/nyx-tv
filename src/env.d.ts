@@ -9,3 +9,6 @@ interface ImportMetaEnv {
   /** Endereço do report-server no Mac para logs da TV (opcional). */
   readonly VITE_REPORT_URL?: string;
 }
+
+/** Versão do package.json, injetada no build (vite.config.ts). */
+declare const __APP_VERSION__: string;

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
 import solid from 'vite-plugin-solid';
 
@@ -47,8 +48,12 @@ function devProxy(): Plugin {
   };
 }
 
+/** Versão única do app: package.json (scripts/release.ts sobe). */
+const version = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version as string;
+
 export default defineConfig({
   base: './',
+  define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: [solid(), classicScripts(), devProxy()],
   build: {
     target: 'chrome76',

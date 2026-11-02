@@ -24,6 +24,10 @@ const SAVE_EVERY_MS = 10000;
 const OVERLAY_MS = 5000;
 const NEXT_EPISODE_S = 8;
 const SEEK_COMMIT_MS = 700;
+/** Filme/episódio grande pode demorar para começar no AVPlay; canal ao vivo usa o StallMonitor. */
+const VOD_STARTUP_MS = 25000;
+/** CH▲▼ seguidos: só sintoniza quando para de apertar. */
+const ZAP_MS = 700;
 
 export function Player(props: { media: Media }) {
   const m = props.media;
@@ -52,7 +56,15 @@ export function Player(props: { media: Media }) {
   const episode = (): Episode | null => (m.kind === 'episode' ? m.episodes[epIndex()] || null : null);
   let lastSave = 0;
   let seeking = false; // entre o salto e o vídeo voltar a andar
+  let awaitingAdvance = false; // salto feito; carregando até o tempo andar de verdade
+  let seekLanded = 0;
+  let seekCommittedAt = 0;
   let seekSteps = 0; // segurar a seta acelera os saltos
+  let vodOpenedAt = 0;
+  let vodRetries = 0;
+  let zapTarget: string | null = null;
+  let zapTimer: ReturnType<typeof setTimeout> | undefined;
+  let zapChain: Promise<void> = Promise.resolve();
 
   let overlayTimer: ReturnType<typeof setTimeout> | undefined;
   let seekTimer: ReturnType<typeof setTimeout> | undefined;
@@ -129,10 +141,24 @@ export function Player(props: { media: Media }) {
     playSource(next);
   }
 
+  /** CH▲▼: mostra o canal de destino na hora, mas só sintoniza quando para de apertar. */
   function zap(step: number) {
     if (m.kind !== 'live') return;
-    call('neighbor', channelId(), m.category, step).then((id) => {
-      if (id) openChannel(id);
+    showOverlay();
+    zapChain = zapChain.then(async () => {
+      const id = await call('neighbor', zapTarget || channelId(), m.category, step);
+      if (!id) return;
+      zapTarget = id;
+      const now = Date.now() / 1000;
+      const r = await call('channelRow', id, now - 60, now + 4 * 3600);
+      if (zapTarget === id) setRow(r);
+      clearTimeout(zapTimer);
+      zapTimer = setTimeout(() => {
+        const target = zapTarget;
+        zapTarget = null;
+        if (target && target !== channelId()) openChannel(target);
+        else if (target) call('channelRow', target, now - 60, now + 4 * 3600).then(setRow);
+      }, ZAP_MS);
     });
   }
 
@@ -200,7 +226,18 @@ export function Player(props: { media: Media }) {
       src = await call('sources', 'episode', ep.id, settings.streamFormat, ep.ext, ep.url || '');
     }
     if (!src[0]) return setStatus('error');
-    player.open(src[0].url, startSec * 1000).catch(() => setStatus('error'));
+    vodOpenedAt = Date.now();
+    player.open(src[0].url, startSec * 1000).catch(() => retryVod());
+  }
+
+  /** Primeira falha costuma ser o servidor "acordando": tenta de novo sozinho uma vez. */
+  function retryVod() {
+    if (vodRetries < 1) {
+      vodRetries++;
+      openVod(pos() / 1000);
+      return;
+    }
+    setStatus('error');
   }
 
   function onEnded() {
@@ -238,12 +275,16 @@ export function Player(props: { media: Media }) {
     seekTimer = setTimeout(async () => {
       seekSteps = 0;
       seeking = true;
-      setStatus('loading');
+      seekLanded = target;
+      seekCommittedAt = Date.now();
       setPos(target);
-      await player.seek(target);
       setSeekTarget(null);
+      setStatus('loading');
+      await player.seek(target);
       seeking = false;
-      // continua "carregando" até o primeiro avanço de tempo depois do salto
+      // pausado não anda: não fica preso no carregando
+      awaitingAdvance = !paused();
+      if (paused()) setStatus('playing');
     }, SEEK_COMMIT_MS);
   }
 
@@ -267,9 +308,18 @@ export function Player(props: { media: Media }) {
       }
       return true;
     }
+    if (k === 'back' && !overlay() && status() === 'playing') {
+      // primeiro Voltar mostra as informações; o segundo sai
+      showOverlay();
+      return true;
+    }
     if (k === 'back' || k === 'stop') {
       saveProgress(true);
       back();
+      return true;
+    }
+    if (k === 'enter' && showNextCta()) {
+      playNextEpisode();
       return true;
     }
     showOverlay();
@@ -303,13 +353,19 @@ export function Player(props: { media: Media }) {
         monitor.buffering();
       },
       onPlaying: () => {
-        if (seeking) return;
+        if (seeking || awaitingAdvance) return;
         setStatus('playing');
+        vodRetries = 0;
         monitor.playing();
         setDur(player.duration());
       },
       onTime: (ms) => {
         if (seeking || seekTarget() !== null) return;
+        if (awaitingAdvance) {
+          // ainda no ponto do salto (ou rápido demais para notar): segue carregando
+          if (ms < seekLanded + 400 || Date.now() - seekCommittedAt < 700) return;
+          awaitingAdvance = false;
+        }
         setPos(ms);
         if (status() !== 'playing') {
           setStatus('playing');
@@ -320,7 +376,7 @@ export function Player(props: { media: Media }) {
         saveProgress();
       },
       onEnd: onEnded,
-      onError: () => (m.kind === 'live' ? fallback() : setStatus('error')),
+      onError: () => (m.kind === 'live' ? fallback() : retryVod()),
     });
     const pop = pushKeyHandler(onKey);
     onCleanup(pop);
@@ -328,10 +384,13 @@ export function Player(props: { media: Media }) {
     else openVod(m.position || 0);
     watchdog = setInterval(() => {
       if (status() === 'error' || seeking) return;
+      if (m.kind !== 'live') {
+        if (status() === 'loading' && !awaitingAdvance && vodOpenedAt && Date.now() - vodOpenedAt > VOD_STARTUP_MS) retryVod();
+        return;
+      }
       const v = monitor.verdict();
       if (!v) return;
       if (m.kind === 'live' && (settings.autoQuality || v === 'startup')) fallback();
-      else if (m.kind !== 'live' && v === 'startup' && status() === 'loading') setStatus('error');
     }, 1000);
   });
 
@@ -341,6 +400,7 @@ export function Player(props: { media: Media }) {
     clearTimeout(seekTimer);
     clearInterval(nextTimer);
     clearInterval(watchdog);
+    clearTimeout(zapTimer);
     // voltou de um canal para a grade: o vídeo segue na caixinha de prévia
     const dest = untrack(top);
     if (m.kind === 'live' && dest.name === 'live' && status() !== 'error' && currentUrl()) startPreview({ channelId: channelId(), category: m.category });
@@ -363,6 +423,11 @@ export function Player(props: { media: Media }) {
     return r && c ? r.programs.find((p) => p.start >= c.stop) : undefined;
   });
   const quality = () => (sources()[srcIndex()] ? sources()[srcIndex()].quality : '');
+  const showNextCta = () => {
+    if (m.kind !== 'episode' || !m.episodes[epIndex() + 1] || !settings.nextEpisodeAt || !dur() || nextIn() > 0) return false;
+    const left = (dur() - pos()) / 1000;
+    return left > 0 && left <= settings.nextEpisodeAt;
+  };
   const shownPos = () => (seekTarget() !== null ? seekTarget()! : pos());
   const seekDelta = () => (seekTarget() !== null ? (seekTarget()! - pos()) / 1000 : 0);
   const vodTitle = () => (m.kind === 'movie' ? m.title : m.kind === 'episode' ? m.seriesTitle : '');
@@ -461,6 +526,13 @@ export function Player(props: { media: Media }) {
           </section>
         </Show>
       </div>
+
+      <Show when={showNextCta()}>
+        <div class="player__next-btn btn btn--primary is-focused">
+          <span>{t('player.nextEpisodeBtn')}</span>
+          <Icon name="next" size={26} />
+        </div>
+      </Show>
 
       <Show when={nextIn() > 0 && m.kind === 'episode'}>
         <div class="player__next stack g12">

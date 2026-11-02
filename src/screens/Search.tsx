@@ -1,5 +1,5 @@
 // Busca: teclado na tela à esquerda, resultados em fileiras à direita. Resultado a cada tecla.
-import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js';
 import { latest } from '../data/client';
 import type { CardItem, SearchResult } from '../data/types';
 import { active, FocusZone, type ListHandle } from '../app/focus';
@@ -19,6 +19,7 @@ export function Search() {
   const [q, setQ] = createSignal('');
   const [res, setRes] = createSignal<SearchResult | null>(null);
   let timer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(timer));
 
   createEffect(
     on(q, (value) => {

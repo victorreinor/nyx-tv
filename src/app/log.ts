@@ -29,4 +29,12 @@ export function installRemoteLog() {
   window.addEventListener('error', (e) => send('error', [e.message, `${e.filename}:${e.lineno}`]));
   window.addEventListener('unhandledrejection', (e) => send('error', ['unhandledrejection', e.reason]));
   send('log', ['boot', navigator.userAgent]);
+  // memória da TV a cada minuto: se só sobe enquanto navega, tem vazamento
+  const perf = performance as Performance & { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } };
+  if (perf.memory) {
+    setInterval(() => {
+      const m = perf.memory!;
+      send('log', ['heap', Math.round(m.usedJSHeapSize / 1048576) + ' MB', 'limite', Math.round(m.jsHeapSizeLimit / 1048576) + ' MB']);
+    }, 60000);
+  }
 }

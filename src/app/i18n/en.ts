@@ -187,4 +187,18 @@ export const en: Record<MessageKey, string> = {
   'toast.updated': 'Playlist updated',
   'toast.exit': 'Press back again to exit',
   'toast.saved': 'Saved',
+
+  'browse.watched': 'Watched',
+  'settings.history': 'History',
+  'history.hint': 'Erases saved progress. Favorites are not affected.',
+  'history.movies': 'Clear movies in progress',
+  'history.series': 'Clear series in progress',
+  'history.channels': 'Clear recent channels',
+  'history.all': 'Clear all history',
+  'history.confirm': 'Press OK again to confirm',
+  'history.cleared': 'History cleared',
+  'player.settings.nextAt': '“Next episode” button',
+  'player.settings.nextAtHint': 'Shows up when this much time is left in the episode.',
+  'player.nextEpisodeBtn': 'Next episode',
+  'common.off': 'Off',
 };

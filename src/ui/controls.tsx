@@ -80,9 +80,11 @@ export function OptionList(props: {
   autofocus?: boolean;
   handle?: (h: ListHandle) => void;
   class?: string;
+  /** 'row' para opções lado a lado (◀ ▶). */
+  axis?: 'row' | 'col';
 }) {
   const list = useList({
-    axis: 'col',
+    axis: props.axis || 'col',
     count: () => props.items().length,
     autofocus: props.autofocus,
     onSelect: (i) => props.onSelect(props.items()[i].id, i),
@@ -99,7 +101,11 @@ export function OptionList(props: {
     <div class={`stack g8 ${props.class || ''}`} ref={list.ref}>
       <For each={props.items()}>
         {(o, i) => (
-          <div class="option" classList={{ 'is-focused': list.isFocused(i()), 'is-selected': !!props.selected && props.selected() === o.id }}>
+          <div
+            class="option"
+            ref={(el) => createEffect(() => list.isFocused(i()) && el.scrollIntoView({ block: 'nearest' }))}
+            classList={{ 'is-focused': list.isFocused(i()), 'is-selected': !!props.selected && props.selected() === o.id }}
+          >
             <Show when={o.icon}>
               <Icon name={o.icon!} size={26} />
             </Show>

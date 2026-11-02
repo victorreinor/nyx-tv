@@ -40,7 +40,10 @@ bun scripts/check-compat.ts
 
 rm -rf "$OUT" && mkdir -p "$OUT"
 cp -R dist/. "$OUT/"
-cp tizen/config.xml "$OUT/"
+# versão do pacote da TV = versão do package.json
+VERSION="$(bun -e 'console.log(require("./package.json").version)')"
+sed "s/ version=\"[0-9.]*\" viewmodes/ version=\"$VERSION\" viewmodes/" tizen/config.xml > "$OUT/config.xml"
+echo "versão $VERSION"
 python3 -I scripts/make-icon.py "$OUT/icon.png" 512
 
 "$SDB" connect "$TV_IP" >/dev/null

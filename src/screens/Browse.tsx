@@ -24,6 +24,8 @@ export function Browse(props: { kind: 'movie' | 'series' }) {
 
   const chips = createMemo<ChipItem[]>(() => [
     { id: 'all', label: t('common.all') },
+    { id: 'continue', label: t('home.continue') },
+    { id: 'watched', label: t('browse.watched') },
     { id: 'fav', label: t('nav.favorites') },
     ...(cats() || []).map((c) => ({ id: c.id, label: c.name, count: c.count })),
   ]);

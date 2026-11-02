@@ -35,6 +35,8 @@ export interface CatalogData {
 }
 
 const FAV_PREFIX: Record<Kind, string> = { live: 'l:', movie: 'm:', series: 's:' };
+/** Listas ordenadas guardadas (LRU): cada categoria visitada custa um array de referências. */
+const MAX_CACHED_LISTS = 16;
 
 export class Catalog {
   channels: Channel[] = [];
@@ -93,6 +95,16 @@ export class Catalog {
     this.epgUntil = until;
   }
 
+  /** Tira da memória programas que já acabaram há mais de 3 h (a grade não volta tanto). */
+  pruneEpg(now = Date.now() / 1000) {
+    const limit = now - 3 * 3600;
+    this.epg.forEach((list, key) => {
+      let i = 0;
+      while (i < list.length && list[i].stop < limit) i++;
+      if (i) this.epg.set(key, list.slice(i));
+    });
+  }
+
   setFilters(f: Filters) {
     this.filters = f;
     this.hidden = new Set(f.hiddenCategories);
@@ -137,11 +149,41 @@ export class Catalog {
     return { value: (it) => (it as Movie).added || 0, id, dir: -1 };
   }
 
+  /** Progresso de um item (filme: o próprio; série: o último episódio mexido). */
+  private progressOf(kind: Kind, it: Item) {
+    if (kind === 'movie') return this.user.getProgress('m:' + it.id);
+    if (kind === 'series') return this.user.latestForSeries(it.id as number);
+    return undefined;
+  }
+
+  /** Abas "Continuar assistindo" e "Assistidos": ordem por quando você viu por último. */
+  private historyList(kind: Kind, category: 'continue' | 'watched'): { items: Item[]; spec: SortSpec<Item> } {
+    const when = new Map<string | number, number>();
+    const items = this.source(kind).filter((it) => {
+      if (!this.visible(it)) return false;
+      const p = this.progressOf(kind, it);
+      if (!p || !p.duration) return false;
+      const pct = p.position / p.duration;
+      const done = pct >= WATCHED && !(kind === 'series' && p.next);
+      const started = pct >= STARTED || p.position >= 60;
+      const keep = category === 'watched' ? done : started && !done;
+      if (keep) when.set(it.id, p.updatedAt);
+      return keep;
+    });
+    const spec: SortSpec<Item> = { value: (it) => when.get(it.id) || 0, id: (it) => it.id, dir: -1 };
+    return { items: items.sort(compareBy(spec)), spec };
+  }
+
   private list(kind: Kind, category: string, sort: SortKey): Item[] {
     const key = `${kind}|${category}|${sort}`;
     const dynamic = category === 'fav' || (kind === 'live' && category === 'recent');
     const cached = !dynamic && this.cache.get(key);
-    if (cached) return cached;
+    if (cached) {
+      // LRU: a mais usada vai para o fim
+      this.cache.delete(key);
+      this.cache.set(key, cached);
+      return cached;
+    }
     let items: Item[];
     if (category === 'fav') {
       items = this.user
@@ -162,7 +204,10 @@ export class Catalog {
       items = this.source(kind).filter((it) => it.categories.indexOf(category) !== -1 && !(this.filters.hideAdult && it.adult));
     }
     items.sort(compareBy(this.spec(kind, sort)));
-    if (!dynamic) this.cache.set(key, items);
+    if (!dynamic) {
+      this.cache.set(key, items);
+      if (this.cache.size > MAX_CACHED_LISTS) this.cache.delete(this.cache.keys().next().value as string);
+    }
     return items;
   }
 
@@ -173,8 +218,9 @@ export class Catalog {
   }
 
   page(kind: Kind, category: string, sort: SortKey, cursor: string | null, limit: number): Page<CardItem> {
-    const list = this.list(kind, category, sort);
-    const { items, next } = keysetPage(list, this.spec(kind, sort), cursor, limit);
+    const history = (category === 'continue' || category === 'watched') && kind !== 'live' ? this.historyList(kind, category) : null;
+    const list = history ? history.items : this.list(kind, category, sort);
+    const { items, next } = keysetPage(list, history ? history.spec : this.spec(kind, sort), cursor, limit);
     const now = Date.now() / 1000;
     return { items: items.map((it) => this.card(kind, it, now)), next, total: list.length };
   }
@@ -196,9 +242,14 @@ export class Catalog {
         image: tmdbImage(m.poster, 'w342'),
         sub: m.year ? String(m.year) : '',
         progress: progress >= STARTED && progress < WATCHED ? progress : undefined,
+        watched: progress >= WATCHED,
       };
     }
     const s = it as Series;
+    const p = this.user.latestForSeries(s.id);
+    const pct = p && p.duration ? p.position / p.duration : 0;
+    const finished = pct >= WATCHED;
+    const at = p ? (finished && p.next ? { s: p.next.season, e: p.next.episode } : { s: p.season || 1, e: p.episode || 1 }) : null;
     return {
       kind,
       id: String(s.id),
@@ -206,6 +257,9 @@ export class Catalog {
       image: tmdbImage(s.poster, 'w342'),
       backdrop: tmdbImage(s.backdrop, 'w1280'),
       sub: [s.year || '', s.genre.split(',')[0]].filter(Boolean).join(' · '),
+      tag: at ? `${at.s}|${at.e}` : undefined,
+      progress: p && !finished && pct >= STARTED ? pct : undefined,
+      watched: !!p && finished && !p.next,
     };
   }
 

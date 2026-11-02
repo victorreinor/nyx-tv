@@ -37,6 +37,17 @@ let playlist: PlaylistConfig | null = null;
 let syncing: Promise<Stats> | null = null;
 const seriesInfoCache = new Map<number, SeriesInfo>();
 const movieInfoCache = new Map<number, MovieInfo>();
+const MAX_INFO = 40;
+
+/** Guarda no cache com limite: o item mais antigo sai primeiro. */
+function remember<K, V>(map: Map<K, V>, key: K, value: V) {
+  map.delete(key);
+  map.set(key, value);
+  if (map.size > MAX_INFO) map.delete(map.keys().next().value as K);
+}
+
+// programas que já passaram saem da memória a cada hora
+setInterval(() => catalog.pruneEpg(), 3600 * 1000);
 
 function emit(e: WorkerEvent) {
   ctx.postMessage({ event: e });
@@ -253,7 +264,7 @@ const api = {
       p.type === 'xtream'
         ? await xc.fetchMovieInfo(p, movie).catch(() => ({ movie, plot: '', cast: '', director: '', genre: '', duration: 0, backdrop: '' }))
         : { movie, plot: '', cast: '', director: '', genre: '', duration: 0, backdrop: '' };
-    movieInfoCache.set(id, info);
+    remember(movieInfoCache, id, info);
     return info;
   },
 
@@ -272,7 +283,7 @@ const api = {
       eps.forEach((e) => bySeason.set(e.season, (bySeason.get(e.season) || []).concat(e)));
       info = { series, seasons: Array.from(bySeason.entries()).sort((a, b) => a[0] - b[0]).map(([season, episodes]) => ({ season, episodes })) };
     }
-    seriesInfoCache.set(id, info);
+    remember(seriesInfoCache, id, info);
     return info;
   },
 
@@ -314,6 +325,13 @@ const api = {
 
   touchChannel(id: string) {
     user.touchChannel(id);
+  },
+
+  /** Configurações › Histórico. */
+  clearHistory(what: 'movie' | 'episode' | 'channels' | 'all') {
+    if (what === 'channels' || what === 'all') user.clearRecentChannels();
+    if (what !== 'channels') user.clearProgress(what === 'all' ? 'all' : what);
+    user.flush();
   },
 
   channelQuality(id: string): Quality | null {

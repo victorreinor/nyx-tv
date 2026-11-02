@@ -1,6 +1,6 @@
 {
   "name": "nyx-tv",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,10 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "tv": "./scripts/tv.sh",
-    "report": "bun tools/report-server.ts"
+    "report": "bun tools/report-server.ts",
+    "release": "bun scripts/release.ts",
+    "check": "bun run typecheck && bun test && bun run build && bun scripts/check-compat.ts",
+    "demo": "bun tools/demo-server.ts"
   },
   "dependencies": {
     "solid-js": "^1.9.18"
@@ -21,5 +24,7 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vite-plugin-solid": "^2.11.15"
-  }
+  },
+  "license": "MIT",
+  "description": "Nyx — IPTV player for Samsung Tizen TVs, made for the night."
 }

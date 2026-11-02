@@ -1,12 +1,12 @@
 // TV ao vivo: grade de programação. ◀ ▶ andam no tempo, ▲ ▼ trocam de canal, OK assiste.
-import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js';
+import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show, untrack } from 'solid-js';
 import { call } from '../data/client';
 import type { ChannelRow, Program } from '../data/types';
 import { FocusZone, type ListHandle } from '../app/focus';
 import { fmtDay, fmtTime, t } from '../app/i18n';
 import { playChannel } from '../app/play';
 import { usePaged } from '../app/paged';
-import { dataVersion, toast } from '../app/state';
+import { dataVersion, stats, toast } from '../app/state';
 import { top } from '../app/router';
 import { player, preview, stopPreview } from '../player/engine';
 import { ChipRow, type ChipItem } from '../ui/controls';
@@ -23,6 +23,8 @@ const ROW_H = 88;
 const ROW_GAP = 8;
 
 const floorHalfHour = (s: number) => Math.floor(s / STEP) * STEP;
+/** Posição da caixinha de prévia (reserva caso a medição falhe). */
+const THUMB_RECT = { x: 1344, y: 55, w: 480, h: 270 };
 
 function programAt(list: Program[], at: number): number {
   for (let i = 0; i < list.length; i++) if (list[i].start <= at && list[i].stop > at) return i;
@@ -57,9 +59,16 @@ export function Live() {
   const isTop = () => top().name === 'live';
   const showPreview = () => !!preview() && isTop();
   createEffect(() => {
-    if (!showPreview() || !thumb) return;
-    const r = thumb.getBoundingClientRect(); // uma medição por prévia, não por tecla
-    player.setRect({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
+    if (!showPreview()) return;
+    // a tela da grade acabou de reaparecer: mede só depois do layout (antes disso ela mede 0×0)
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const r = thumb ? thumb.getBoundingClientRect() : null;
+        player.setRect(r && r.width > 0 ? { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) } : THUMB_RECT);
+      }),
+    );
+    // voltou de um canal: a grade volta para "agora" (untrack: o relógio não pode reexecutar isto)
+    untrack(goNow);
   });
   const [previewRow] = createResource(preview, (p) => call('channelRow', p.channelId, Date.now() / 1000, Date.now() / 1000 + 60));
   // saiu da TV ao vivo (outra seção): fecha o vídeo e libera a conexão
@@ -77,16 +86,30 @@ export function Live() {
   };
 
   function moveCursor(to: number) {
-    const min = nowSec() - 3 * 3600;
-    const next = Math.max(min, to);
+    const now = nowSec();
+    const st = stats();
+    const max = st && st.epgUntil ? st.epgUntil - 60 : now + 7 * 86400;
+    const next = Math.min(max, Math.max(now - 3 * 3600, to));
     setCursor(next);
     if (next < winStart()) setWinStart(floorHalfHour(next));
     else if (next >= winStart() + SPAN - STEP / 2) setWinStart(floorHalfHour(next) - STEP);
-    if (next > range().to - 3 * 3600) setRange({ from: next - 3 * 3600, to: next + 12 * 3600 });
+    // os programas carregados cobrem uma janela; saiu dela (para frente OU para trás), recarrega
+    const r = range();
+    if (next < r.from + 3600 || next > r.to - 3 * 3600) setRange({ from: next - 3 * 3600, to: next + 12 * 3600 });
+  }
+
+  function goNow() {
+    moveCursor(nowSec());
+    setWinStart(floorHalfHour(nowSec()));
   }
 
   function onGridKey(k: string, row: ChannelRow): boolean {
     if (k === 'back') {
+      // longe do horário atual: o primeiro Voltar traz a grade para "agora"
+      if (Math.abs(cursor() - nowSec()) > STEP || winStart() !== floorHalfHour(nowSec())) {
+        goNow();
+        return true;
+      }
       const c = chips();
       if (c) c.focus(Math.max(0, chipItems().findIndex((x) => x.id === category())));
       return true;
@@ -99,8 +122,7 @@ export function Live() {
       return true;
     }
     if (k === 'red') {
-      moveCursor(nowSec());
-      setWinStart(floorHalfHour(nowSec()));
+      goNow();
       return true;
     }
     if (k === 'green') {

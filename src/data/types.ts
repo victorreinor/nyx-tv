@@ -124,6 +124,9 @@ export interface CardItem {
   progress?: number; // 0..1
   badges?: Quality[];
   resume?: Resume;
+  /** Selo na capa: episódio onde parou ("T2 E5"). */
+  tag?: string;
+  watched?: boolean;
 }
 
 export interface Resume {

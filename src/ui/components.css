@@ -115,10 +115,12 @@
 .rail { position: relative; }
 .rail__title { margin-bottom: 18px; padding-left: 4px; }
 .rail__viewport { position: relative; overflow: visible; }
-.rail__track { position: absolute; top: 0; left: 0; height: 100%; transition: transform var(--slow) var(--ease); will-change: transform; }
+.rail__track { position: absolute; top: 0; left: 0; height: 100%; transition: transform var(--slow) var(--ease); }
+/* camada de GPU só na lista focada: TV fraca tem pouca memória de vídeo */
+.rail.is-active .rail__track, .vgrid.is-active .vgrid__track { will-change: transform; }
 .rail__item { position: absolute; top: 0; left: 0; }
 .vgrid { position: relative; overflow: hidden; padding: 12px 16px 0; margin: -12px -16px 0; }
-.vgrid__track { position: absolute; top: 12px; left: 16px; transition: transform var(--slow) var(--ease); will-change: transform; }
+.vgrid__track { position: absolute; top: 12px; left: 16px; transition: transform var(--slow) var(--ease); }
 .vgrid__cell { position: absolute; top: 0; left: 0; }
 .chiprow .rail__item > .chip { width: 250px; }
 
@@ -163,3 +165,9 @@
 .field__label { font-size: 18px; color: var(--t3); font-weight: 700; }
 .field__input { height: 68px; padding: 0 22px; border-radius: 14px; border: 3px solid var(--line); background: var(--bg); color: var(--t1); font: 600 24px 'Manrope', sans-serif; outline: none; width: 100%; }
 .field.is-focused .field__input { border-color: var(--ring); background: var(--s2); }
+
+/* capa já começada / assistida */
+.card__tag--progress { background: var(--accent); color: var(--on-accent); }
+.card.is-watched .card__tag--progress { background: rgba(10, 10, 18, 0.85); color: var(--ok); }
+.card.is-started .card__frame { border-color: rgba(142, 123, 255, 0.55); }
+.card.is-started.is-focused .card__frame { border-color: var(--ring); }

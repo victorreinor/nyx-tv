@@ -186,6 +186,20 @@ export const ptBR = {
   'toast.updated': 'Lista atualizada',
   'toast.exit': 'Pressione voltar de novo para sair',
   'toast.saved': 'Salvo',
+
+  'browse.watched': 'Assistidos',
+  'settings.history': 'Histórico',
+  'history.hint': 'Apaga o progresso salvo. Favoritos não são afetados.',
+  'history.movies': 'Limpar filmes em andamento',
+  'history.series': 'Limpar séries em andamento',
+  'history.channels': 'Limpar canais recentes',
+  'history.all': 'Limpar todo o histórico',
+  'history.confirm': 'Pressione OK de novo para confirmar',
+  'history.cleared': 'Histórico limpo',
+  'player.settings.nextAt': 'Botão “Próximo episódio”',
+  'player.settings.nextAtHint': 'Aparece quando faltar este tempo para o episódio acabar.',
+  'player.nextEpisodeBtn': 'Próximo episódio',
+  'common.off': 'Desligado',
 };
 
 export type MessageKey = keyof typeof ptBR;

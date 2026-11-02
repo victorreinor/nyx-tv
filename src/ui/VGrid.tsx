@@ -66,7 +66,7 @@ export function VGrid<T>(props: VGridProps<T>) {
   });
 
   return (
-    <div class={`vgrid ${props.class || ''}`} ref={list.ref} style={{ height: `${props.height}px` }}>
+    <div class={`vgrid ${props.class || ''}`} classList={{ 'is-active': list.isActive() }} ref={list.ref} style={{ height: `${props.height}px` }}>
       <div class="vgrid__track" style={{ transform: `translate3d(0,${-firstRow() * strideY}px,0)` }}>
         <For each={indices()}>
           {(i) => (

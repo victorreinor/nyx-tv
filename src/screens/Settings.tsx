@@ -6,25 +6,26 @@ import { FocusZone } from '../app/focus';
 import { fmtAgo, fmtDay, LOCALES, t } from '../app/i18n';
 import { go, reset } from '../app/router';
 import { type QualityPref, removePlaylistSetting, setSetting, settings } from '../app/settings';
-import { applyFilters, dataVersion, openActive, runSync, stats, toast } from '../app/state';
+import { applyFilters, dataVersion, openActive, runSync, setDataVersion, stats, toast } from '../app/state';
 import { type Action, ActionRow, OptionList, type OptionItem } from '../ui/controls';
 import { Logo } from '../ui/Icon';
 import { Badge, Toggle } from '../ui/primitives';
 import { PinDialog } from '../ui/overlays';
 import { VGrid } from '../ui/VGrid';
 
-type SectionId = 'playlists' | 'language' | 'parental' | 'player' | 'categories' | 'storage' | 'about';
+type SectionId = 'playlists' | 'language' | 'parental' | 'player' | 'categories' | 'history' | 'storage' | 'about';
 const SECTIONS: { id: SectionId; icon: OptionItem['icon'] }[] = [
   { id: 'playlists', icon: 'list' },
   { id: 'language', icon: 'globe' },
   { id: 'parental', icon: 'lock' },
   { id: 'player', icon: 'play' },
   { id: 'categories', icon: 'layers' },
+  { id: 'history', icon: 'refresh' },
   { id: 'storage', icon: 'storage' },
   { id: 'about', icon: 'info' },
 ];
 
-const VERSION = '0.1.0';
+const VERSION = __APP_VERSION__;
 
 export function Settings() {
   const [section, setSection] = createSignal<SectionId>('playlists');
@@ -55,6 +56,9 @@ export function Settings() {
           </Match>
           <Match when={section() === 'categories'}>
             <CategoriesPanel />
+          </Match>
+          <Match when={section() === 'history'}>
+            <HistoryPanel />
           </Match>
           <Match when={section() === 'storage'}>
             <StoragePanel />
@@ -242,9 +246,22 @@ function PlayerPanel() {
     { id: 'auto-switch', label: t('player.autoSwitch'), hint: t('player.settings.autoHint'), right: () => <Toggle on={settings.autoQuality} /> },
     { id: 'format', label: t('player.settings.format'), hint: settings.streamFormat === 'ts' ? t('player.settings.ts') : t('player.settings.hls') },
   ];
+  const nextAt = (): OptionItem[] => [
+    { id: '0', label: t('common.off') },
+    { id: '30', label: '30 s' },
+    { id: '60', label: '1 min' },
+    { id: '90', label: '1 min 30 s' },
+    { id: '120', label: '2 min' },
+    { id: '180', label: '3 min' },
+  ];
   return (
     <Panel title={t('player.settings.quality')}>
       <OptionList items={qualities} selected={() => settings.quality} onSelect={(id) => setSetting('quality', id as QualityPref)} />
+      <h3 class="t-card settings__subtitle">{t('player.settings.nextAt')}</h3>
+      <p class="t-caption c-3">{t('player.settings.nextAtHint')}</p>
+      <div class="settings__chips">
+        <OptionList axis="row" class="settings__inline" items={nextAt} selected={() => String(settings.nextEpisodeAt)} onSelect={(id) => setSetting('nextEpisodeAt', Number(id))} />
+      </div>
       <OptionList
         items={other}
         onSelect={(id) => {
@@ -320,6 +337,34 @@ function StoragePanel() {
           },
         ]}
       />
+    </Panel>
+  );
+}
+
+function HistoryPanel() {
+  const [confirm, setConfirm] = createSignal<string | null>(null);
+  const items = (): OptionItem[] => [
+    { id: 'movie', label: t('history.movies'), icon: 'movies' },
+    { id: 'episode', label: t('history.series'), icon: 'series' },
+    { id: 'channels', label: t('history.channels'), icon: 'live' },
+    { id: 'all', label: t('history.all'), icon: 'trash' },
+  ];
+  const run = (id: string) => {
+    // ação destrutiva: pede um segundo OK
+    if (confirm() !== id) {
+      setConfirm(id);
+      toast(t('history.confirm'));
+      return;
+    }
+    setConfirm(null);
+    call('clearHistory', id as 'movie' | 'episode' | 'channels' | 'all').then(() => {
+      toast(t('history.cleared'));
+      setDataVersion(dataVersion() + 1);
+    });
+  };
+  return (
+    <Panel title={t('settings.history')} hint={t('history.hint')}>
+      <OptionList items={items} onSelect={run} onFocusItem={(id) => confirm() !== id && setConfirm(null)} />
     </Panel>
   );
 }

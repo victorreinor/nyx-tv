@@ -17,7 +17,7 @@ mkdirSync(out, { recursive: true });
 const browser = await puppeteer.launch({
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: true,
-  userDataDir: join(tmpdir(), 'nyx-shot-chrome'),
+  userDataDir: process.env.SHOT_PROFILE || join(tmpdir(), 'nyx-shot-chrome'),
   args: ['--window-size=1920,1080', '--autoplay-policy=no-user-gesture-required', '--lang=pt-BR'],
   defaultViewport: { width: 1920, height: 1080 },
 });
