@@ -225,6 +225,8 @@ export const ptBR = {
   'player.slow': 'Está demorando mais que o normal. Arquivos 4K podem levar até 1 minuto.',
   'player.backToCancel': 'Voltar cancela',
   'player.sleepMin': 'Timer para dormir (min)',
+  'player.goingTo': 'Indo para {t}…',
+  'player.waitLoad': 'Aguarde carregar (Voltar cancela)',
 };
 
 export type MessageKey = keyof typeof ptBR;

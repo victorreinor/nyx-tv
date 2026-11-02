@@ -48,6 +48,9 @@ export function Player(props: { media: Media }) {
   const [guide, setGuide] = createSignal<{ rows: ChannelRow[]; index: number } | null>(null);
   /** Segundos esperando (carregando/travado), para dar feedback em vez de girar calado. */
   const [waitSec, setWaitSec] = createSignal(0);
+  /** Destino do último salto enquanto o vídeo ainda não voltou a andar (filme/episódio). */
+  const [landing, setLanding] = createSignal<number | null>(null);
+  let lastBusyToast = 0;
   let waitTimer: ReturnType<typeof setInterval> | undefined;
   createEffect(
     on(status, (st) => {
@@ -335,12 +338,16 @@ export function Player(props: { media: Media }) {
       seekCommittedAt = Date.now();
       setPos(target);
       setSeekTarget(null);
+      setLanding(target);
       setStatus('loading');
       await player.seek(target);
       seeking = false;
       // pausado não anda: não fica preso no carregando
       awaitingAdvance = !paused();
-      if (paused()) setStatus('playing');
+      if (paused()) {
+        setStatus('playing');
+        setLanding(null);
+      }
     }, SEEK_COMMIT_MS);
   }
 
@@ -381,7 +388,12 @@ export function Player(props: { media: Media }) {
     showOverlay();
     if (status() === 'error' && k === 'enter') {
       if (m.kind === 'live') openChannel(channelId());
-      else openVod(pos() / 1000);
+      else {
+        const at = landing() !== null ? landing()! : pos();
+        setLanding(null);
+        awaitingAdvance = false;
+        openVod(at / 1000);
+      }
       return true;
     }
     if (k === 'yellow') {
@@ -395,10 +407,13 @@ export function Player(props: { media: Media }) {
       else if (k === 'blue') call('toggleFav', 'live', channelId()).then((on) => toast(on ? t('toast.favAdded') : t('toast.favRemoved')));
       return true;
     }
-    const seeking = k === 'left' || k === 'right' || k === 'rw' || k === 'ff';
-    if (seeking && status() !== 'playing' && !paused()) {
-      // pular antes do vídeo começar pedia trechos novos ao servidor lento e podia travar a TV
-      toast(t('player.waitStart'));
+    // carregando (abertura ou depois de um salto): só Voltar funciona, com aviso
+    const busy = landing() !== null || ((status() === 'loading' || status() === 'buffering') && !paused());
+    if (busy && k !== 'info') {
+      if (Date.now() - lastBusyToast > 2500) {
+        lastBusyToast = Date.now();
+        toast(t('player.waitLoad'));
+      }
       return true;
     }
     if (k === 'enter' || k === 'playpause') togglePause();
@@ -442,6 +457,7 @@ export function Player(props: { media: Media }) {
           // ainda no ponto do salto (ou rápido demais para notar): segue carregando
           if (ms < seekLanded + 400 || Date.now() - seekCommittedAt < 700) return;
           awaitingAdvance = false;
+          setLanding(null);
         }
         setPos(ms);
         if (status() !== 'playing') {
@@ -463,7 +479,7 @@ export function Player(props: { media: Media }) {
       if (status() === 'error' || seeking) return;
       if (m.kind !== 'live') {
         if (status() === 'loading' && !awaitingAdvance && vodOpenedAt && Date.now() - vodOpenedAt > VOD_STARTUP_MS) retryVod();
-        else if (status() === 'buffering' && waitSec() > VOD_STALL_S) setStatus('error');
+        else if ((status() === 'buffering' || landing() !== null) && waitSec() > VOD_STALL_S) setStatus('error');
         return;
       }
       const v = monitor.verdict();
@@ -547,18 +563,19 @@ export function Player(props: { media: Media }) {
           </div>
         </div>
       </Show>
-      <Show when={seekTarget() === null && (status() === 'loading' || status() === 'buffering')}>
+      <Show when={seekTarget() === null && status() !== 'error' && (status() === 'loading' || status() === 'buffering' || landing() !== null)}>
         <div class="player__center stack g16" style={{ 'justify-items': 'center' }}>
           <Spinner size={72} />
-          <Show when={waitSec() >= 3}>
-            <div class="player__wait stack g8">
-              <span class="t-card">{t('player.loading', { n: waitSec() })}</span>
-              <Show when={waitSec() >= 8}>
-                <span class="t-caption c-2">{t('player.slow')}</span>
-                <span class="t-caption c-3">{t('player.backToCancel')}</span>
-              </Show>
-            </div>
-          </Show>
+          <div class="player__wait stack g8">
+            <span class="t-card">
+              {landing() !== null ? t('player.goingTo', { t: fmtClock(landing()! / 1000) }) : t('common.loading')}
+              {waitSec() >= 3 ? `  ·  ${waitSec()} s` : ''}
+            </span>
+            <Show when={waitSec() >= 8}>
+              <span class="t-caption c-2">{t('player.slow')}</span>
+              <span class="t-caption c-3">{t('player.backToCancel')}</span>
+            </Show>
+          </div>
         </div>
       </Show>
       <Show when={status() === 'error'}>

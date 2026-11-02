@@ -226,4 +226,6 @@ export const en: Record<MessageKey, string> = {
   'player.slow': 'This is taking longer than usual. 4K files can take up to a minute.',
   'player.backToCancel': 'Back cancels',
   'player.sleepMin': 'Sleep timer (min)',
+  'player.goingTo': 'Jumping to {t}…',
+  'player.waitLoad': 'Wait for it to load (Back cancels)',
 };
