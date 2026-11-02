@@ -131,6 +131,8 @@
 .settings__version { align-self: end; }
 .settings__update { margin-top: 24px; justify-items: start; }
 .settings__panel { flex: 1 1 auto; min-width: 0; padding-top: 88px; height: 100%; overflow: hidden; }
+/* folga para o botão focado (scale) não cortar na borda: padding e margem se anulam */
+.settings__panel { padding-left: 16px; margin-left: -16px; }
 .playlist-card { padding: 28px; border-radius: var(--r-panel); background: var(--s1); border: 1px solid var(--line); }
 .playlist-card.is-active { background: var(--s2); border-color: var(--line); }
 .playlist-card__avatar { width: 56px; height: 56px; border-radius: 14px; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; }
