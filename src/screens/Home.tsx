@@ -12,6 +12,7 @@ import { CHANNEL, ChannelCard, POSTER, PosterCard, WIDE, WideCard } from '../ui/
 import { type Action, ActionRow } from '../ui/controls';
 import { Img, ProgressBar } from '../ui/primitives';
 import { Rail } from '../ui/Rail';
+import { realPlot } from './MovieDetail';
 import { useClock } from '../ui/useClock';
 
 type SectionKind = 'continue' | 'newEpisodes' | 'live' | 'movies' | 'series';
@@ -59,12 +60,18 @@ export function Home() {
     () => (hero() && hero()!.kind === 'movie' ? Number(hero()!.id) : null),
     (id) => call('movieInfo', id),
   );
+  // TMDB (se houver) cobre fundo e sinopse que o provedor não manda
+  const [heroTmdb] = createResource(
+    () => (hero() && hero()!.kind === 'movie' ? Number(hero()!.id) : null),
+    (id) => call('tmdbMovieView', id),
+  );
   const heroImage = () => {
     const h = hero();
     if (!h) return '';
     if (h.backdrop) return h.backdrop;
     const info = heroInfo();
-    return (info && info.backdrop) || h.image;
+    const tm = heroTmdb();
+    return (info && info.backdrop) || (tm && tm.backdrop) || h.image;
   };
 
   const heroActions = (): Action[] => {
@@ -101,7 +108,7 @@ export function Home() {
           <section class="home__hero stack g20" classList={{ 'is-away': offset() > 0 }}>
             <span class="t-micro c-ring">{hero()!.resume ? t('home.heroContinue') : t('home.heroNew')}</span>
             <h1 class="t-hero clamp-2">{hero()!.title}</h1>
-            <p class="t-body c-2">{hero()!.resume ? continueLabel(hero()!) : heroInfoPlot(heroInfo(), hero()!)}</p>
+            <p class="t-body c-2 clamp-3">{hero()!.resume ? continueLabel(hero()!) : heroInfoPlot(heroInfo(), hero()!) || (heroTmdb() ? heroTmdb()!.overview : '')}</p>
             <Show when={hero()!.progress}>
               <div style={{ width: '480px' }}>
                 <ProgressBar value={hero()!.progress || 0} />
@@ -126,8 +133,8 @@ export function Home() {
 }
 
 function heroInfoPlot(info: { plot: string; duration: number } | null | undefined, item: CardItem): string {
-  if (info && info.plot) return info.plot;
-  return item.sub || '';
+  const plot = info ? realPlot(info.plot) : '';
+  return plot || (item.kind === 'series' ? item.sub || '' : '');
 }
 
 function HomeRail(props: { kind: SectionKind; data: HomeData; handle: (h: ListHandle) => void }) {

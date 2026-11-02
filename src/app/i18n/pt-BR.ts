@@ -237,6 +237,21 @@ export const ptBR = {
   'reminder.channel': 'no canal {ch} · {t}',
   'reminder.watch': 'Assistir',
   'reminder.dismiss': 'Dispensar',
+  'detail.trailer': 'Trailer',
+  'detail.similar': 'Semelhantes que você tem',
+  'detail.castTitle': 'Elenco',
+  'detail.ageFree': 'Livre',
+  'detail.age': '{n} anos',
+  'settings.tmdb': 'TMDB',
+  'tmdb.hint': 'Completa sinopse, imagens, elenco, episódios e semelhantes. Se o TMDB falhar ou demorar, o app segue igual.',
+  'tmdb.use': 'Usar TMDB',
+  'tmdb.key': 'Chave da API (v3)',
+  'tmdb.on': 'Ativo',
+  'tmdb.off': 'Desligado',
+  'tmdb.noKey': 'Sem chave',
+  'tmdb.saved': 'Chave salva',
+  'tmdb.trailerFail': 'Não foi possível abrir o YouTube',
+  'search.searching': 'Buscando…',
 };
 
 export type MessageKey = keyof typeof ptBR;

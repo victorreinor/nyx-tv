@@ -24,6 +24,8 @@ import type {
   WorkerEvent,
 } from './types';
 import { UserStore } from './user';
+import { configureTmdb, tmdbEnabled, tmdbMovie, tmdbSeason, tmdbSeries } from './tmdb';
+import type { TmdbView } from './types';
 import * as xc from './xtream';
 
 const ctx = self as unknown as { postMessage(m: unknown): void; onmessage: ((e: MessageEvent) => void) | null };
@@ -266,8 +268,8 @@ const api = {
     const p = current();
     const info: MovieInfo =
       p.type === 'xtream'
-        ? await xc.fetchMovieInfo(p, movie).catch(() => ({ movie, plot: '', cast: '', director: '', genre: '', duration: 0, backdrop: '' }))
-        : { movie, plot: '', cast: '', director: '', genre: '', duration: 0, backdrop: '' };
+        ? await xc.fetchMovieInfo(p, movie).catch(() => ({ movie, plot: '', cast: '', director: '', genre: '', duration: 0, backdrop: '', tmdbId: 0, trailer: '' }))
+        : { movie, plot: '', cast: '', director: '', genre: '', duration: 0, backdrop: '', tmdbId: 0, trailer: '' };
     remember(movieInfoCache, id, info);
     return info;
   },
@@ -329,6 +331,39 @@ const api = {
 
   touchChannel(id: string) {
     user.touchChannel(id);
+  },
+
+  // ---------- TMDB (opcional; nunca lança erro: sem dados = null) ----------
+
+  setTmdb(key: string, locale: string) {
+    configureTmdb(key, locale);
+  },
+
+  async tmdbMovieView(movieId: number): Promise<TmdbView | null> {
+    const movie = catalog.movieById.get(movieId);
+    if (!movie || !tmdbEnabled()) return null;
+    try {
+      const info = await api.movieInfo(movieId);
+      const d = await tmdbMovie(info ? info.tmdbId : 0, movie.name, movie.year);
+      return d ? { ...d, similar: catalog.matchRecommendations('movie', d.recommendations, movie.id) } : null;
+    } catch {
+      return null;
+    }
+  },
+
+  async tmdbSeriesView(seriesId: number): Promise<TmdbView | null> {
+    const s = catalog.seriesById.get(seriesId);
+    if (!s || !tmdbEnabled()) return null;
+    try {
+      const d = await tmdbSeries(s.name, s.year);
+      return d ? { ...d, similar: catalog.matchRecommendations('series', d.recommendations, s.id) } : null;
+    } catch {
+      return null;
+    }
+  },
+
+  tmdbSeasonView(tvId: number, season: number) {
+    return tmdbSeason(tvId, season).catch(() => null);
   },
 
   markSeriesSeen(seriesId: number) {

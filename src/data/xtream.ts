@@ -220,5 +220,7 @@ export async function fetchMovieInfo(p: PlaylistConfig, movie: Movie): Promise<M
     genre: String(info.genre || ''),
     duration: toNumber(info.duration_secs),
     backdrop: String(backdrop || ''),
+    tmdbId: toNumber(info.tmdb_id || info.tmdb),
+    trailer: String(info.youtube_trailer || ''),
   };
 }

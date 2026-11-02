@@ -1,7 +1,7 @@
 // Catálogo em memória dentro do worker: listas ordenadas em cache, páginas keyset,
 // grade por janela e busca. A UI só recebe CardItem/ChannelRow de cada página.
 import { programsInRange } from './epg';
-import { displayTitle, tmdbImage } from './normalize';
+import { displayTitle, searchKey, tmdbImage, versionTags } from './normalize';
 import { compareBy, keysetPage, type SortSpec } from './paging';
 import { rankMatches } from './search';
 import type {
@@ -55,6 +55,7 @@ export class Catalog {
   private cache = new Map<string, Item[]>();
   private hidden = new Set<string>();
   private keys: Record<Kind, string[]> = { live: [], movie: [], series: [] };
+  private titleIndex: Partial<Record<Kind, Map<string, Item[]>>> = {};
 
   constructor(private user: UserStore) {}
 
@@ -73,6 +74,7 @@ export class Catalog {
     this.movieById = new Map(d.movies.map((m) => [m.id, m] as [number, Movie]));
     this.seriesById = new Map(d.series.map((s) => [s.id, s] as [number, Series]));
     this.keys = { live: d.channels.map((c) => c.key), movie: d.movies.map((m) => m.key), series: d.series.map((s) => s.key) };
+    this.titleIndex = {};
     const counts = new Map<string, number>();
     const count = (list: Item[]) => list.forEach((it) => it.categories.forEach((c) => counts.set(c, (counts.get(c) || 0) + 1)));
     count(d.channels);
@@ -211,6 +213,39 @@ export class Catalog {
     return items;
   }
 
+  /**
+   * "Semelhantes que você tem": recomendações do TMDB que EXISTEM no seu catálogo
+   * (mesmo título, traduzido ou original, e ano próximo).
+   */
+  matchRecommendations(kind: 'movie' | 'series', recs: { title: string; original: string; year: number }[], excludeId: number): CardItem[] {
+    let idx = this.titleIndex[kind];
+    if (!idx) {
+      idx = new Map();
+      for (const it of this.source(kind)) {
+        const k = searchKey(displayTitle(it.name));
+        const list = idx.get(k);
+        if (list) list.push(it);
+        else idx.set(k, [it]);
+      }
+      this.titleIndex[kind] = idx;
+    }
+    const out: CardItem[] = [];
+    const seen = new Set<string | number>([excludeId]);
+    for (const r of recs) {
+      for (const name of [r.title, r.original]) {
+        const cands = (name && idx.get(searchKey(name))) || [];
+        const hit = cands.find((c) => !seen.has(c.id) && this.visible(c) && (!r.year || !(c as Movie).year || Math.abs((c as Movie).year - r.year) <= 1));
+        if (hit) {
+          seen.add(hit.id);
+          out.push(this.card(kind, hit));
+          break;
+        }
+      }
+      if (out.length >= 15) break;
+    }
+    return out;
+  }
+
   lookup(kind: Kind, id: string): Item | undefined {
     if (kind === 'live') return this.channelById.get(id);
     if (kind === 'movie') return this.movieById.get(Number(id));
@@ -243,6 +278,7 @@ export class Catalog {
         sub: m.year ? String(m.year) : '',
         progress: progress >= STARTED && progress < WATCHED ? progress : undefined,
         watched: progress >= WATCHED,
+        versions: versionTags(m.name),
       };
     }
     const s = it as Series;
@@ -262,6 +298,7 @@ export class Catalog {
       progress: p && !finished && pct >= STARTED ? pct : undefined,
       watched: !!p && finished && !p.next,
       newEpisode: baseline > 0 && s.added > baseline,
+      versions: versionTags(s.name),
     };
   }
 

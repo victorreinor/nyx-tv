@@ -1,5 +1,5 @@
 // Cards. Recebem accessors para atualizar só a classe de foco (sem recriar DOM).
-import { Show } from 'solid-js';
+import { For, Show } from 'solid-js';
 import type { CardItem, ChannelRow } from '../data/types';
 import { fmtTime, t } from '../app/i18n';
 import { Img, ProgressBar, QualityBadges } from './primitives';
@@ -26,6 +26,11 @@ export function PosterCard(props: { item: () => CardItem; focused: () => boolean
         <Img class="card__img" src={props.item().image} alt={props.item().title} />
         <Show when={posterTag(props.item())}>
           <span class="card__tag card__tag--progress">{posterTag(props.item())}</span>
+        </Show>
+        <Show when={props.item().versions && props.item().versions!.length}>
+          <span class="card__versions row g4">
+            <For each={props.item().versions}>{(v) => <span class="card__version">{v}</span>}</For>
+          </span>
         </Show>
         <Show when={props.item().progress}>
           <div class="card__progress">
@@ -60,6 +65,17 @@ export function WideCard(props: { item: () => CardItem; focused: () => boolean; 
       <Show when={props.item().sub}>
         <div class="card__sub ellipsis">{props.item().sub}</div>
       </Show>
+    </div>
+  );
+}
+
+/** Pessoa do elenco (TMDB): foto redonda, nome e personagem. */
+export function CastCard(props: { person: () => { name: string; character: string; photo: string }; focused: () => boolean }) {
+  return (
+    <div class="cast-card" classList={{ 'is-focused': props.focused() }}>
+      <Img class="cast-card__photo" src={props.person().photo} alt={props.person().name} fallback={props.person().name} />
+      <span class="cast-card__name ellipsis">{props.person().name}</span>
+      <span class="cast-card__role ellipsis">{props.person().character}</span>
     </div>
   );
 }

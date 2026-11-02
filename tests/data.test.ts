@@ -210,3 +210,14 @@ describe('novos episódios', () => {
     expect(cat.card('series', series[0]).newEpisode).toBe(false);
   });
 });
+
+describe('selos de versão', () => {
+  test('versões do nome viram selo e o título fica limpo', async () => {
+    const { versionTags, displayTitle } = await import('../src/data/normalize');
+    expect(versionTags('A Odisseia dos Tontos [L]')).toEqual(['LEG']);
+    expect(versionTags('Besouro Azul 4K')).toEqual(['4K']);
+    expect(versionTags('Acenda meu fogo(Dublado)')).toEqual(['DUB']);
+    expect(displayTitle('Besouro Azul 4K')).toBe('Besouro Azul');
+    expect(displayTitle('Acenda meu fogo(Dublado)')).toBe('Acenda meu fogo');
+  });
+});

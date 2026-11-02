@@ -31,7 +31,7 @@ done
 cd "$ROOT"
 if [ "$SEED" = 1 ]; then
   set -a; . ./.env.local; set +a
-  export VITE_SEED_NAME="${XC_NAME:-Minha lista}" VITE_SEED_HOST="$XC_HOST" VITE_SEED_USER="$XC_USER" VITE_SEED_PASS="$XC_PASS"
+  export VITE_SEED_NAME="${XC_NAME:-Minha lista}" VITE_SEED_HOST="$XC_HOST" VITE_SEED_USER="$XC_USER" VITE_SEED_PASS="$XC_PASS" VITE_SEED_TMDB="${TMDB_KEY:-}"
 fi
 [ "$REPORT" = 1 ] && export VITE_REPORT_URL="http://$MAC_IP:8787/report?f=nyx"
 

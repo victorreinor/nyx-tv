@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_SEED_HOST?: string;
   readonly VITE_SEED_USER?: string;
   readonly VITE_SEED_PASS?: string;
+  readonly VITE_SEED_TMDB?: string;
   /** Endereço do report-server no Mac para logs da TV (opcional). */
   readonly VITE_REPORT_URL?: string;
 }

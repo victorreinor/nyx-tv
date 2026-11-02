@@ -2,7 +2,7 @@
 import { createMemo, createResource, createSignal, For, type JSX, Match, Show, Switch } from 'solid-js';
 import { call } from '../data/client';
 import type { Category, Kind, PlaylistConfig } from '../data/types';
-import { FocusZone } from '../app/focus';
+import { FocusZone, useList } from '../app/focus';
 import { fmtAgo, fmtDay, LOCALES, t } from '../app/i18n';
 import { go, reset } from '../app/router';
 import { type QualityPref, removePlaylistSetting, setSetting, settings } from '../app/settings';
@@ -13,7 +13,7 @@ import { Badge, Toggle } from '../ui/primitives';
 import { PinDialog } from '../ui/overlays';
 import { VGrid } from '../ui/VGrid';
 
-type SectionId = 'playlists' | 'language' | 'parental' | 'player' | 'categories' | 'history' | 'storage' | 'about';
+type SectionId = 'playlists' | 'language' | 'parental' | 'player' | 'categories' | 'history' | 'tmdb' | 'storage' | 'about';
 const SECTIONS: { id: SectionId; icon: OptionItem['icon'] }[] = [
   { id: 'playlists', icon: 'list' },
   { id: 'language', icon: 'globe' },
@@ -21,6 +21,7 @@ const SECTIONS: { id: SectionId; icon: OptionItem['icon'] }[] = [
   { id: 'player', icon: 'play' },
   { id: 'categories', icon: 'layers' },
   { id: 'history', icon: 'refresh' },
+  { id: 'tmdb', icon: 'movies' },
   { id: 'storage', icon: 'storage' },
   { id: 'about', icon: 'info' },
 ];
@@ -59,6 +60,9 @@ export function Settings() {
           </Match>
           <Match when={section() === 'history'}>
             <HistoryPanel />
+          </Match>
+          <Match when={section() === 'tmdb'}>
+            <TmdbPanel />
           </Match>
           <Match when={section() === 'storage'}>
             <StoragePanel />
@@ -366,5 +370,43 @@ function HistoryPanel() {
     <Panel title={t('settings.history')} hint={t('history.hint')}>
       <OptionList items={items} onSelect={run} onFocusItem={(id) => confirm() !== id && setConfirm(null)} />
     </Panel>
+  );
+}
+
+function TmdbPanel() {
+  const status = () => (!settings.tmdbKey ? t('tmdb.noKey') : settings.tmdbEnabled ? t('tmdb.on') : t('tmdb.off'));
+  const items = (): OptionItem[] => [{ id: 'use', label: t('tmdb.use'), hint: status(), right: () => <Toggle on={settings.tmdbEnabled && !!settings.tmdbKey} /> }];
+  return (
+    <Panel title={t('settings.tmdb')} hint={t('tmdb.hint')}>
+      <OptionList items={items} onSelect={() => setSetting('tmdbEnabled', !settings.tmdbEnabled)} />
+      <TmdbKeyField />
+    </Panel>
+  );
+}
+
+/** Campo da chave: OK abre o teclado da TV; Salvar grava. */
+function TmdbKeyField() {
+  let input: HTMLInputElement | undefined;
+  const [value, setValue] = createSignal(settings.tmdbKey);
+  const field = useList({ axis: 'col', count: () => 1, onSelect: () => input && input.focus() });
+  return (
+    <div class="stack g16">
+      <label class="field" classList={{ 'is-focused': field.isFocused(0) }} ref={field.ref}>
+        <span class="field__label">{t('tmdb.key')}</span>
+        <input ref={input} class="field__input" type="text" value={value()} autocomplete="off" spellcheck={false} onChange={(e) => setValue(e.currentTarget.value.trim())} onBlur={(e) => setValue(e.currentTarget.value.trim())} />
+      </label>
+      <ActionRow
+        actions={() => [
+          {
+            label: t('common.save'),
+            icon: 'check',
+            onSelect: () => {
+              setSetting('tmdbKey', value());
+              toast(t('tmdb.saved'));
+            },
+          },
+        ]}
+      />
+    </div>
   );
 }

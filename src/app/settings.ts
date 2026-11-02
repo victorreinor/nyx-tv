@@ -26,6 +26,9 @@ export interface Settings {
   activePlaylist: string | null;
   recentSearches: string[];
   reminders: Reminder[];
+  /** Chave v3 do TMDB (opcional). Sem chave ou desligado = só dados do provedor. */
+  tmdbKey: string;
+  tmdbEnabled: boolean;
 }
 
 const KEY = 'nyx:settings';
@@ -50,6 +53,8 @@ const defaults: Settings = {
   activePlaylist: null,
   recentSearches: [],
   reminders: [],
+  tmdbKey: '',
+  tmdbEnabled: true,
 };
 
 function load(): Settings {

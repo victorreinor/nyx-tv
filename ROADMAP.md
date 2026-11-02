@@ -27,9 +27,11 @@ Ordem = valor para quem assiste ÷ esforço. Cada entrega vira uma versão (SemV
 - [x] **Novos episódios**: selo "Novo ep." e fileira na Início para séries que você acompanha (favoritou, assistiu ou abriu) e que ganharam episódio depois disso.
 - [x] **Lembretes**: na grade, amarela num programa futuro; 1 min antes o app avisa (em qualquer tela) e OK sintoniza. Só funciona com o Nyx aberto, porque a TV não deixa app comum avisar fechado.
 
-## 1.3 — TMDB à prova de falhas
+## 1.3 — TMDB à prova de falhas ✅
 
-- [ ] **Enriquecimento pelo TMDB** (opcional, com chave gratuita): fundos, trailer, elenco com foto e notas.
+- [x] **Busca com abas e contagem** (Filmes · Séries · Canais), grade sem nada escondido para o lado, "Buscando…" com debounce de 250 ms
+- [x] **Selos de versão** nas capas (4K, LEG, DUB) tirados do nome
+- [x] **Enriquecimento pelo TMDB** (opcional, com chave gratuita): fundos, trailer, elenco com foto e notas.
   - Filmes: o provedor já manda o `tmdb_id` no detalhe, então a busca é exata. Séries: busca por nome + ano.
   - A tela nunca espera o TMDB: abre com os dados do provedor e o TMDB só complementa quando chega.
   - Cada consulta tem limite de 4 s e no máximo 2 rodam ao mesmo tempo, dentro do worker.

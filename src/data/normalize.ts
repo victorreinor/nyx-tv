@@ -41,11 +41,23 @@ export function cleanChannelName(name: string): string {
     .trim();
 }
 
-/** Título para exibir: tira marcações do provedor ("Devorador [L]", "Nós [Lançamento]", "Filme (2024)"). */
+/** Versões que o provedor marca no nome: vira selo na capa (o título exibido fica limpo). */
+export function versionTags(name: string): string[] {
+  const n = String(name || '');
+  const out: string[] = [];
+  if (/\b(4k|uhd)\b/i.test(n)) out.push('4K');
+  if (/\[l\]|\blegendad/i.test(n)) out.push('LEG');
+  if (/dublad|\[d\]|\bdual\b/i.test(n)) out.push('DUB');
+  return out;
+}
+
+/** Título para exibir: tira marcações do provedor ("Devorador [L]", "Nós [Lançamento]", "Filme 4K", "(Dublado)"). */
 export function displayTitle(name: string): string {
   const clean = String(name || '')
     .replace(/\s*\[[^\]]*\]\s*/g, ' ')
+    .replace(/\s*\((dublado|legendado|dual [aá]udio)\)\s*/gi, ' ')
     .replace(/\s*\((19|20)\d{2}\)\s*$/, '')
+    .replace(/\s+4K\s*$/i, '')
     .replace(/\s+/g, ' ')
     .trim();
   return clean || String(name || '').trim();

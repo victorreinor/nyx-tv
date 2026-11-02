@@ -33,7 +33,7 @@ export function ActionRow(props: { actions: () => Action[]; autofocus?: boolean;
 export interface ChipItem {
   id: string;
   label: string;
-  count?: number;
+  count?: number | string;
 }
 
 /** Categorias em fileira horizontal (virtualizada: aguenta centenas). */

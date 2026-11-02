@@ -42,6 +42,7 @@ searches 40 thousand titles while you type.
 | 🔍 **Instant search** | In-memory search across channels, movies and series: 10–35 ms on the TV, accent-insensitive. |
 | ⭐ **Favorites & history** | Favorite channels, movies and series. "Continue watching" and "Watched" tabs; posters show where you stopped (S2 E5) and series you follow get a "New ep." badge. |
 | ⚡ **Fast on weak hardware** | Data lives in a Web Worker, lists are virtualized, and the app opens from cache in under a second. |
+| 🎬 **TMDB (optional)** | With a free key: synopsis, age rating, backdrop, cast with photos, real episode titles/images, trailer and "Similar titles you have" — never blocks: if TMDB fails, the screen is the same as without it. |
 | 🌐 **3 languages** | Português (Brasil), English, Español. |
 | 🔒 **Parental PIN** | Adult categories hidden by default (PIN `0000`, changeable). |
 | 🎨 **Own design system** | Night palette, Manrope, focus ring + scale, zero blur and zero heavy shadows. |
@@ -133,6 +134,7 @@ XC_NAME=My playlist
 XC_HOST=http://your-server:8080
 XC_USER=your_user
 XC_PASS=your_password
+TMDB_KEY=your_tmdb_v3_key   # optional
 ```
 
 `./scripts/tv.sh --report` streams the TV's errors to your computer (`bun run report`).
@@ -220,6 +222,7 @@ junta as versões SD/HD/FHD/4K do mesmo canal, lembra exatamente onde você paro
 | 🔍 **Busca instantânea** | Busca em memória em canais, filmes e séries: 10–35 ms na TV, sem ligar para acentos. |
 | ⭐ **Favoritos e histórico** | Canais, filmes e séries favoritos. Abas "Continuar assistindo" e "Assistidos"; a capa mostra onde parou (T2 E5) e as séries que você acompanha ganham o selo "Novo ep.". |
 | ⚡ **Rápido em TV fraca** | Dados num Web Worker, listas virtualizadas, abre do cache em menos de 1 segundo. |
+| 🎬 **TMDB (opcional)** | Com a chave gratuita: sinopse, classificação, fundo, elenco com foto, título e imagem reais dos episódios, trailer e "Semelhantes que você tem". Nunca trava: se o TMDB falhar, a tela fica igual a sem ele. |
 | 🌐 **3 idiomas** | Português (Brasil), English, Español. |
 | 🔒 **PIN para adultos** | Categorias adultas escondidas por padrão (PIN `0000`, dá para trocar). |
 | 🎨 **Design system próprio** | Paleta noturna, Manrope, foco com anel e escala, zero desfoque e zero sombra pesada. |
@@ -282,6 +285,7 @@ XC_NAME=Minha lista
 XC_HOST=http://seu-servidor:8080
 XC_USER=seu_usuario
 XC_PASS=sua_senha
+TMDB_KEY=sua_chave_v3_do_tmdb   # opcional
 ```
 
 `./scripts/tv.sh --report` manda os erros da TV para o seu computador (`bun run report`).

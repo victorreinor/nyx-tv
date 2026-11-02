@@ -11,7 +11,8 @@ import { clearFocus, dispatchKey, FocusZone, focusZone, type Zone } from './focu
 import { t } from './i18n';
 import { exitApp, keyName, registerTizenKeys } from './keys';
 import { back, goSection, isSection, type Route, reset, stack, top } from './router';
-import { activePlaylist, newId, upsertPlaylist } from './settings';
+import { activePlaylist, newId, setSetting, settings, upsertPlaylist } from './settings';
+import { call } from '../data/client';
 import { openActive, toast } from './state';
 import { Home } from '../screens/Home';
 import { Live } from '../screens/Live';
@@ -46,6 +47,7 @@ function renderRoute(r: Route): JSX.Element {
 /** Em desenvolvimento, `./scripts/tv.sh --seed` injeta a lista do .env.local para não digitar na TV. */
 function seedPlaylist() {
   const env = import.meta.env;
+  if (env.VITE_SEED_TMDB && !settings.tmdbKey) setSetting('tmdbKey', env.VITE_SEED_TMDB);
   if (activePlaylist() || !env.VITE_SEED_HOST) return;
   upsertPlaylist({ id: newId(), name: env.VITE_SEED_NAME || 'Lista', type: 'xtream', host: env.VITE_SEED_HOST, username: env.VITE_SEED_USER, password: env.VITE_SEED_PASS });
 }
@@ -128,6 +130,9 @@ export function App() {
       });
     }),
   );
+
+  // TMDB: liga/desliga e troca idioma conforme as preferências
+  createEffect(() => call('setTmdb', settings.tmdbEnabled ? settings.tmdbKey : '', settings.locale));
 
   const showSidebar = () => isSection(top());
 

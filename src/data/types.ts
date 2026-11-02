@@ -111,6 +111,22 @@ export interface MovieInfo {
   genre: string;
   duration: number;
   backdrop: string;
+  tmdbId: number;
+  trailer: string; // id do YouTube que o provedor informar
+}
+
+/** Complemento do TMDB pronto para a tela (null = sem TMDB; a tela segue com o provedor). */
+export interface TmdbView {
+  id: number;
+  overview: string;
+  genres: string[];
+  runtime: number;
+  certification: string;
+  rating: number;
+  backdrop: string;
+  cast: { name: string; character: string; photo: string }[];
+  trailer: string;
+  similar: CardItem[];
 }
 
 /** Item pronto para um card. A UI nunca recebe a lista inteira, só páginas disso. */
@@ -129,6 +145,8 @@ export interface CardItem {
   watched?: boolean;
   /** Série que você acompanha ganhou episódio desde a última vez que você a abriu. */
   newEpisode?: boolean;
+  /** Selos de versão tirados do nome: 4K, LEG, DUB. */
+  versions?: string[];
 }
 
 export interface Resume {

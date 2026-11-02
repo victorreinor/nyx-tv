@@ -172,3 +172,15 @@
 .card.is-started .card__frame { border-color: rgba(142, 123, 255, 0.55); }
 .card.is-started.is-focused .card__frame { border-color: var(--ring); }
 .card.is-new .card__tag--progress { background: var(--ok); color: var(--on-accent); }
+
+/* elenco (TMDB) */
+.cast-card { display: grid; justify-items: center; width: 180px; transition: transform var(--fast) var(--ease); }
+.cast-card__photo { width: 140px; height: 140px; border-radius: 50%; object-fit: cover; background: var(--s3); border: var(--ring-w) solid transparent; }
+.cast-card .img-fallback.cast-card__photo { font-size: 26px; }
+.cast-card__name { margin-top: 12px; max-width: 180px; font-size: 19px; font-weight: 700; color: var(--t2); }
+.cast-card__role { max-width: 180px; font-size: 16px; color: var(--t3); }
+.cast-card.is-focused { transform: scale(1.06); }
+.cast-card.is-focused .cast-card__photo { border-color: var(--ring); }
+.cast-card.is-focused .cast-card__name { color: var(--t1); }
+.card__versions { position: absolute; left: 10px; bottom: 14px; }
+.card__version { padding: 3px 7px; border-radius: 6px; background: rgba(10, 10, 18, 0.85); color: var(--t1); font-size: 13px; font-weight: 800; letter-spacing: 0.05em; }
