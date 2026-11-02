@@ -4,6 +4,11 @@ Versões seguem [SemVer](https://semver.org/lang/pt-BR/): **correção** sobe o 
 **funcionalidade** sobe o do meio (1.1.0), **mudança grande** sobe o primeiro (2.0.0).
 Gerado por `bun run release patch|minor|major`.
 
+## [1.1.5] — 2026-11-02
+
+### Correções
+- vídeo que para em silêncio volta a mostrar "Carregando…"
+
 ## [1.1.4] — 2026-11-02
 
 ### Correções
