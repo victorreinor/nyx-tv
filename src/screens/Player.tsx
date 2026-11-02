@@ -201,7 +201,16 @@ export function Player(props: { media: Media }) {
     if (audioChecked) return;
     audioChecked = true;
     const tr = player.tracks();
-    if (import.meta.env.VITE_REPORT_URL) console.log('[tracks]', JSON.stringify(tr));
+    if (import.meta.env.VITE_REPORT_URL) {
+      const av = (window as any).webapis && (window as any).webapis.avplay;
+      let raw = 'sem getTotalTrackInfo';
+      try {
+        raw = av && av.getTotalTrackInfo ? JSON.stringify(av.getTotalTrackInfo()) : raw;
+      } catch (e) {
+        raw = 'erro: ' + String(e);
+      }
+      console.log('[tracks]', JSON.stringify(tr), 'bruto:', raw);
+    }
     if (tr.audio.length < 2) return;
     const want = settings.locale === 'pt-BR' ? 'pt' : settings.locale;
     const match = tr.audio.find((a) => langKey(a.lang) === want);
@@ -392,7 +401,7 @@ export function Player(props: { media: Media }) {
         vodRetries = 0;
         monitor.playing();
         setDur(player.duration());
-        autoAudio();
+        if (!audioChecked) setTimeout(autoAudio, 2000);
       },
       onSubtitle: (text, durationMs) => {
         setSubtitle(text.replace(/<[^>]+>/g, ''));

@@ -165,3 +165,24 @@ http://h/series/u/p/5.mkv`);
     expect(m.episodes.get(m.series[0].id)!.length).toBe(2);
   });
 });
+
+describe('mini-grade', () => {
+  test('canal fora da categoria cai para todos os canais (nunca vazia)', async () => {
+    const { Catalog } = await import('../src/data/catalog');
+    const { UserStore } = await import('../src/data/user');
+    const user = new UserStore();
+    const cat = new Catalog(user);
+    const chans = groupChannels(
+      [
+        { num: 1, name: 'A HD', stream_id: 1, category_id: 1 },
+        { num: 2, name: 'B HD', stream_id: 2, category_id: 1 },
+      ],
+      new Set(),
+    );
+    cat.setCatalog({ channels: chans, movies: [], series: [], categories: mapCategories([{ category_id: 1, category_name: 'X' }], 'live'), at: 1 });
+    const g = cat.miniGuide('fav', chans[1].id, 0, 1);
+    expect(g.rows.length).toBe(2);
+    expect(g.index).toBe(1);
+    expect(cat.neighborChannel(chans[1].id, 'fav', 1)).toBe(chans[0].id);
+  });
+});

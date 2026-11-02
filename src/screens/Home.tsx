@@ -153,7 +153,7 @@ function HomeRail(props: { kind: SectionKind; data: HomeData; handle: (h: ListHa
         gap={CHANNEL.gap}
         height={CHANNEL.h + 20}
         handle={props.handle}
-        onSelect={(row) => playChannel(row.id, 'fav')}
+        onSelect={(row) => playChannel(row.id, row.fav ? 'fav' : 'recent')}
         render={(row, f) => <ChannelCard row={row} focused={f} />}
       />
     );

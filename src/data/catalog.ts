@@ -290,9 +290,15 @@ export class Catalog {
     return { items: (items as Channel[]).map((ch) => this.row(ch, from, to)), next, total: list.length };
   }
 
+  /** Lista de canais da categoria; se o canal não estiver nela (ou ela vier vazia), usa todos. */
+  private liveListWith(category: string, channelId: string): Channel[] {
+    const list = this.list('live', category, 'num') as Channel[];
+    return list.some((c) => c.id === channelId) ? list : (this.list('live', 'all', 'num') as Channel[]);
+  }
+
   /** Mini-grade do player: canais da categoria só com agora/a seguir + posição do canal atual. */
   miniGuide(category: string, channelId: string, from: number, to: number): { rows: ChannelRow[]; index: number } {
-    const list = this.list('live', category, 'num') as Channel[];
+    const list = this.liveListWith(category, channelId);
     const rows = list.map((ch) => {
       const r = this.row(ch, from, to);
       r.programs = r.programs.slice(0, 2);
@@ -308,7 +314,7 @@ export class Catalog {
 
   /** Vizinho na lista atual (CH▲/CH▼ no player). */
   neighborChannel(id: string, category: string, step: number): string | null {
-    const list = this.list('live', category, 'num');
+    const list = this.liveListWith(category, id);
     const i = list.findIndex((c) => c.id === id);
     if (i === -1 || !list.length) return null;
     return String(list[(i + step + list.length) % list.length].id);
