@@ -8,9 +8,10 @@ export interface UserState {
   progress: Record<string, Progress>; // m:<filme> | e:<episódio>
   recentChannels: string[];
   channelQuality: Record<string, Quality>; // escolha manual ou aprendida (troca automática)
+  seenSeries: Record<string, number>; // série → quando você abriu ela por último (s)
 }
 
-const empty = (): UserState => ({ favorites: {}, progress: {}, recentChannels: [], channelQuality: {} });
+const empty = (): UserState => ({ favorites: {}, progress: {}, recentChannels: [], channelQuality: {}, seenSeries: {} });
 
 /** Abaixo disso não conta como começado; acima disso conta como assistido. */
 export const STARTED = 0.03;
@@ -89,6 +90,22 @@ export class UserStore {
     for (const k in all) if (kind === 'all' || all[k].kind === kind) delete all[k];
     this.seriesIndex = null;
     this.persist();
+  }
+
+  /** Abriu a série: os episódios que existem agora deixam de ser "novos". */
+  markSeriesSeen(seriesId: number) {
+    this.state.seenSeries[String(seriesId)] = Date.now() / 1000;
+    this.persist();
+  }
+
+  /**
+   * Desde quando a série é "conhecida": abriu, favoritou ou assistiu algo dela (o mais recente).
+   * 0 = você não acompanha a série (sem selo de novidade).
+   */
+  seriesBaseline(seriesId: number): number {
+    const fav = this.state.favorites['s:' + seriesId];
+    const p = this.latestForSeries(seriesId);
+    return Math.max(this.state.seenSeries[String(seriesId)] || 0, fav ? fav / 1000 : 0, p ? p.updatedAt / 1000 : 0);
   }
 
   clearRecentChannels() {

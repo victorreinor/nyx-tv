@@ -15,17 +15,17 @@ Ordem = valor para quem assiste ÷ esforço. Cada entrega vira uma versão (SemV
 - [x] 1.0.1: prévia ao vivo na grade removida (vídeo preto na UN50AU7700)
 - [x] 1.0.2: Voltar na grade traz a hora atual **e** o canal que estava tocando
 
-## 1.1 — player
+## 1.1 — player ✅
 
-- [ ] **Mini-grade no player**: lista de canais com "agora/a seguir" por cima do vídeo em tela cheia; troca sem sair do player.
-- [ ] **Timer para dormir**: 15/30/60/90 min; aviso de 1 min antes, com opção de continuar.
-- [ ] **Áudio e legenda** (dublado/legendado), pelas faixas do AVPlay. A legenda é desenhada pelo app. Precisa validar na TV, porque depende de cada stream.
+- [x] **Mini-grade no player**: lista de canais com "agora/a seguir" por cima do vídeo em tela cheia; troca sem sair do player.
+- [x] **Timer para dormir**: 15/30/60/90 min; aviso de 1 min antes, com opção de continuar.
+- [x] **Áudio e legenda**, pelas faixas do AVPlay (a legenda é desenhada pelo app). Na lista atual, cada filme tem uma faixa só (o provedor separa "dublado" e "[L]").
+- [x] 1.1.3–1.1.6: carregamento sempre com feedback, controles bloqueados enquanto carrega, vigia de vídeo parado.
 
-## 1.2 — séries e grade
+## 1.2 — séries e grade ✅
 
-- [ ] **Versão dublada ⇄ legendada**: o provedor cadastra cada versão como um filme separado ("Filme" e "Filme [L]") com uma faixa só cada, então a troca de áudio do player não tem o que mostrar. Na tela do filme, um botão acha e abre a outra versão.
-- [ ] **Novos episódios**: selo nas séries favoritas quando o provedor adicionar episódio (compara com a última vez que você abriu a série).
-- [ ] **Lembretes**: na grade, marcar um programa futuro; quando começar, o app avisa e OK sintoniza. Só funciona com o Nyx aberto, porque a TV não deixa app comum avisar fechado.
+- [x] **Novos episódios**: selo "Novo ep." e fileira na Início para séries que você acompanha (favoritou, assistiu ou abriu) e que ganharam episódio depois disso.
+- [x] **Lembretes**: na grade, amarela num programa futuro; 1 min antes o app avisa (em qualquer tela) e OK sintoniza. Só funciona com o Nyx aberto, porque a TV não deixa app comum avisar fechado.
 
 ## 1.3 — TMDB à prova de falhas
 

@@ -247,6 +247,7 @@ export class Catalog {
     }
     const s = it as Series;
     const p = this.user.latestForSeries(s.id);
+    const baseline = this.user.seriesBaseline(s.id);
     const pct = p && p.duration ? p.position / p.duration : 0;
     const finished = pct >= WATCHED;
     const at = p ? (finished && p.next ? { s: p.next.season, e: p.next.episode } : { s: p.season || 1, e: p.episode || 1 }) : null;
@@ -260,6 +261,7 @@ export class Catalog {
       tag: at ? `${at.s}|${at.e}` : undefined,
       progress: p && !finished && pct >= STARTED ? pct : undefined,
       watched: !!p && finished && !p.next,
+      newEpisode: baseline > 0 && s.added > baseline,
     };
   }
 
@@ -369,8 +371,14 @@ export class Catalog {
       .map((c) => this.row(c, now, now + 3600));
     const recentMovies = this.page('movie', 'recent', 'added', null, 20).items;
     const recentSeries = this.page('series', 'recent', 'added', null, 20).items;
+    // séries que você acompanha (favorita, assistiu ou abriu) e ganharam episódio depois disso
+    const newEpisodes = this.series
+      .filter((s) => this.visible(s) && this.user.seriesBaseline(s.id) > 0 && s.added > this.user.seriesBaseline(s.id))
+      .sort((a, b) => b.added - a.added)
+      .slice(0, 20)
+      .map((s) => this.card('series', s));
     const hero = continueItems[0] || recentSeries.find((s) => !!s.backdrop) || recentMovies[0] || null;
-    return { hero, continueItems, favChannels, recentMovies, recentSeries };
+    return { hero, continueItems, newEpisodes, favChannels, recentMovies, recentSeries };
   }
 }
 

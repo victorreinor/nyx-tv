@@ -331,6 +331,10 @@ const api = {
     user.touchChannel(id);
   },
 
+  markSeriesSeen(seriesId: number) {
+    user.markSeriesSeen(seriesId);
+  },
+
   /** Configurações › Histórico. */
   clearHistory(what: 'movie' | 'episode' | 'channels' | 'all') {
     if (what === 'channels' || what === 'all') user.clearRecentChannels();

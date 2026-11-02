@@ -11,6 +11,7 @@ export const CHANNEL = { w: 352, h: 120, gap: 24 };
 
 /** Selo da capa: "T2 E5" onde parou na série, ou "Visto". */
 function posterTag(item: CardItem): string {
+  if (item.newEpisode) return t('card.newEpisode');
   if (item.tag) {
     const [s, e] = item.tag.split('|');
     return t('common.seasonEp', { s, e });
@@ -20,7 +21,7 @@ function posterTag(item: CardItem): string {
 
 export function PosterCard(props: { item: () => CardItem; focused: () => boolean }) {
   return (
-    <div class="card card--poster" classList={{ 'is-focused': props.focused(), 'is-started': !!props.item().progress, 'is-watched': !!props.item().watched }}>
+    <div class="card card--poster" classList={{ 'is-focused': props.focused(), 'is-started': !!props.item().progress, 'is-watched': !!props.item().watched, 'is-new': !!props.item().newEpisode }}>
       <div class="card__frame">
         <Img class="card__img" src={props.item().image} alt={props.item().title} />
         <Show when={posterTag(props.item())}>

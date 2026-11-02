@@ -171,3 +171,4 @@
 .card.is-watched .card__tag--progress { background: rgba(10, 10, 18, 0.85); color: var(--ok); }
 .card.is-started .card__frame { border-color: rgba(142, 123, 255, 0.55); }
 .card.is-started.is-focused .card__frame { border-color: var(--ring); }
+.card.is-new .card__tag--progress { background: var(--ok); color: var(--on-accent); }

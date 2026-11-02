@@ -7,6 +7,8 @@ import { fmtDay, fmtTime, t } from '../app/i18n';
 import { playChannel } from '../app/play';
 import { usePaged } from '../app/paged';
 import { dataVersion, lastChannel, stats, toast } from '../app/state';
+import { hasReminder, settings, toggleReminder } from '../app/settings';
+import { Icon } from '../ui/Icon';
 import { top } from '../app/router';
 import { ChipRow, type ChipItem } from '../ui/controls';
 import { Img, LiveBadge, QualityBadges, ColorKeys } from '../ui/primitives';
@@ -130,6 +132,16 @@ export function Live() {
       if (c) c.focus(Math.max(0, chipItems().findIndex((x) => x.id === category())));
       return true;
     }
+    if (k === 'yellow') {
+      const p = focusedProgram();
+      if (!p || p.start <= nowSec()) {
+        toast(t('reminder.onlyFuture'));
+        return true;
+      }
+      const on = toggleReminder({ channelId: row.id, channelName: row.name, start: p.start, stop: p.stop, title: p.title });
+      toast(on ? t('reminder.set', { title: p.title, t: fmtTime(p.start) }) : t('reminder.removed'));
+      return true;
+    }
     if (k === 'blue') {
       call('toggleFav', 'live', row.id).then((on) => {
         toast(on ? t('toast.favAdded') : t('toast.favRemoved'));
@@ -238,6 +250,7 @@ export function Live() {
           keys={[
             { color: 'red', label: t('live.now') },
             { color: 'green', label: t('live.category') },
+            { color: 'yellow', label: t('live.remind') },
             { color: 'blue', label: t('live.fav') },
           ]}
         />
@@ -285,7 +298,12 @@ function GuideRow(props: { row: () => ChannelRow; focused: () => boolean; cursor
                 }}
                 style={{ left: `${c.left}px`, width: `${c.width}px` }}
               >
-                <span class="guide-cell__title ellipsis">{c.p.title}</span>
+                <span class="guide-cell__title ellipsis">
+                  <Show when={settings.reminders.length && hasReminder(props.row().id, c.p.start)}>
+                    <Icon name="bell" size={18} class="guide-cell__bell" />
+                  </Show>
+                  {c.p.title}
+                </span>
                 <span class="guide-cell__time">
                   {fmtTime(c.p.start)} – {fmtTime(c.p.stop)}
                 </span>

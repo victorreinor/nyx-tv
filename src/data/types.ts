@@ -127,6 +127,8 @@ export interface CardItem {
   /** Selo na capa: episódio onde parou ("T2 E5"). */
   tag?: string;
   watched?: boolean;
+  /** Série que você acompanha ganhou episódio desde a última vez que você a abriu. */
+  newEpisode?: boolean;
 }
 
 export interface Resume {
@@ -192,6 +194,7 @@ export interface SearchResult {
 export interface HomeData {
   hero: CardItem | null;
   continueItems: CardItem[];
+  newEpisodes: CardItem[];
   favChannels: ChannelRow[];
   recentMovies: CardItem[];
   recentSeries: CardItem[];

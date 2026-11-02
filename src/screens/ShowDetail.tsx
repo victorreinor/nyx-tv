@@ -17,6 +17,7 @@ import { DetailHero } from './DetailHero';
 export function ShowDetail(props: { id: string }) {
   const seriesId = Number(props.id);
   const [info] = createResource(() => call('seriesInfo', seriesId));
+  call('markSeriesSeen', seriesId);
   const [progress] = createResource(
     () => top().name === 'show' && props.id,
     () => call('seriesProgress', seriesId),

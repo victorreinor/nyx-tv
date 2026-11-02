@@ -14,8 +14,8 @@ import { Img, ProgressBar } from '../ui/primitives';
 import { Rail } from '../ui/Rail';
 import { useClock } from '../ui/useClock';
 
-type SectionKind = 'continue' | 'live' | 'movies' | 'series';
-const HEIGHT: Record<SectionKind, number> = { continue: 370, live: 216, movies: 472, series: 472 };
+type SectionKind = 'continue' | 'newEpisodes' | 'live' | 'movies' | 'series';
+const HEIGHT: Record<SectionKind, number> = { continue: 370, newEpisodes: 472, live: 216, movies: 472, series: 472 };
 const RAILS_TOP = 640;
 
 export function continueLabel(it: CardItem): string {
@@ -37,6 +37,7 @@ export function Home() {
     if (!d) return [] as SectionKind[];
     const out: SectionKind[] = [];
     if (d.continueItems.length) out.push('continue');
+    if (d.newEpisodes.length) out.push('newEpisodes');
     if (d.favChannels.length) out.push('live');
     if (d.recentMovies.length) out.push('movies');
     if (d.recentSeries.length) out.push('series');
@@ -158,10 +159,10 @@ function HomeRail(props: { kind: SectionKind; data: HomeData; handle: (h: ListHa
       />
     );
   }
-  const items = () => (props.kind === 'movies' ? props.data.recentMovies : props.data.recentSeries);
+  const items = () => (props.kind === 'movies' ? props.data.recentMovies : props.kind === 'newEpisodes' ? props.data.newEpisodes : props.data.recentSeries);
   return (
     <Rail
-      title={props.kind === 'movies' ? t('home.recentMovies') : t('home.recentSeries')}
+      title={props.kind === 'movies' ? t('home.recentMovies') : props.kind === 'newEpisodes' ? t('home.newEpisodes') : t('home.recentSeries')}
       items={items}
       itemWidth={POSTER.w}
       gap={POSTER.gap}

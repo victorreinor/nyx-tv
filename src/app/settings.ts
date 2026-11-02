@@ -4,6 +4,14 @@ import type { Filters, PlaylistConfig, Quality } from '../data/types';
 
 export type QualityPref = 'auto' | Exclude<Quality, ''>;
 
+export interface Reminder {
+  channelId: string;
+  channelName: string;
+  start: number; // s
+  stop: number; // s
+  title: string;
+}
+
 export interface Settings {
   locale: 'pt-BR' | 'en' | 'es';
   pin: string;
@@ -17,6 +25,7 @@ export interface Settings {
   playlists: PlaylistConfig[];
   activePlaylist: string | null;
   recentSearches: string[];
+  reminders: Reminder[];
 }
 
 const KEY = 'nyx:settings';
@@ -40,6 +49,7 @@ const defaults: Settings = {
   playlists: [],
   activePlaylist: null,
   recentSearches: [],
+  reminders: [],
 };
 
 function load(): Settings {
@@ -81,6 +91,23 @@ export function removePlaylistSetting(id: string) {
   setStore('playlists', settings.playlists.filter((x) => x.id !== id));
   if (settings.activePlaylist === id) setStore('activePlaylist', settings.playlists[0] ? settings.playlists[0].id : null);
   save();
+}
+
+const sameReminder = (a: Reminder, channelId: string, start: number) => a.channelId === channelId && a.start === start;
+
+export function hasReminder(channelId: string, start: number): boolean {
+  return settings.reminders.some((r) => sameReminder(r, channelId, start));
+}
+
+/** Liga/desliga o lembrete. Retorna se ficou ligado. */
+export function toggleReminder(r: Reminder): boolean {
+  const on = !hasReminder(r.channelId, r.start);
+  setSetting('reminders', on ? settings.reminders.concat(r) : settings.reminders.filter((x) => !sameReminder(x, r.channelId, r.start)));
+  return on;
+}
+
+export function removeReminder(r: Reminder) {
+  setSetting('reminders', settings.reminders.filter((x) => !sameReminder(x, r.channelId, r.start)));
 }
 
 export function filters(): Filters {

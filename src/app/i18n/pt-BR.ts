@@ -227,6 +227,16 @@ export const ptBR = {
   'player.sleepMin': 'Timer para dormir (min)',
   'player.goingTo': 'Indo para {t}…',
   'player.waitLoad': 'Aguarde carregar (Voltar cancela)',
+  'home.newEpisodes': 'Novos episódios',
+  'card.newEpisode': 'Novo ep.',
+  'live.remind': 'Lembrar',
+  'reminder.set': 'Lembrete: {title} às {t}',
+  'reminder.removed': 'Lembrete removido',
+  'reminder.onlyFuture': 'Lembrete só para programas que ainda vão começar',
+  'reminder.title': 'Começa agora: {title}',
+  'reminder.channel': 'no canal {ch} · {t}',
+  'reminder.watch': 'Assistir',
+  'reminder.dismiss': 'Dispensar',
 };
 
 export type MessageKey = keyof typeof ptBR;

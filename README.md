@@ -35,12 +35,12 @@ searches 40 thousand titles while you type.
 
 | | |
 |---|---|
-| 📺 **Real TV guide** | 8-day EPG grid with a "now" line, time navigation with ◀ ▶ and category filters. |
+| 📺 **Real TV guide** | 8-day EPG grid with a "now" line, time navigation with ◀ ▶, category filters and reminders (🔔 1 min before it starts). |
 | 🎚️ **Smart quality** | SD/HD/FHD/4K variants become one channel. If a stream stalls, Nyx drops a level on its own (4K → FHD → HD → SD) and remembers it. |
 | 🌙 **Sleep timer & tracks** | Turn off in 15–90 min, dubbed/subtitled track selection (Portuguese audio picked automatically when available). |
 | ▶️ **Continue watching** | Movies and episodes resume at the exact second. "Next episode" button near the end, plus autoplay. |
 | 🔍 **Instant search** | In-memory search across channels, movies and series: 10–35 ms on the TV, accent-insensitive. |
-| ⭐ **Favorites & history** | Favorite channels, movies and series. "Continue watching" and "Watched" tabs; posters show where you stopped (S2 E5). |
+| ⭐ **Favorites & history** | Favorite channels, movies and series. "Continue watching" and "Watched" tabs; posters show where you stopped (S2 E5) and series you follow get a "New ep." badge. |
 | ⚡ **Fast on weak hardware** | Data lives in a Web Worker, lists are virtualized, and the app opens from cache in under a second. |
 | 🌐 **3 languages** | Português (Brasil), English, Español. |
 | 🔒 **Parental PIN** | Adult categories hidden by default (PIN `0000`, changeable). |
@@ -147,7 +147,7 @@ XC_PASS=your_password
 | Back | now → categories → menu | show info → exit | show info → exit |
 | 🔴 Red | jump to now | — | — |
 | 🟢 Green | categories | — | — |
-| 🟡 Yellow | — | options: quality, audio, subtitles, sleep timer | options: audio, subtitles, sleep timer |
+| 🟡 Yellow | remind me | options: quality, audio, subtitles, sleep timer | options: audio, subtitles, sleep timer |
 | 🔵 Blue | favorite | favorite | — |
 | CH ▲▼ | — | change channel | — |
 | ⏪ ⏩ | — | — | −30 s / +30 s |
@@ -213,12 +213,12 @@ junta as versões SD/HD/FHD/4K do mesmo canal, lembra exatamente onde você paro
 
 | | |
 |---|---|
-| 📺 **Grade de verdade** | 8 dias de programação, linha do "agora", navegação no tempo com ◀ ▶ e filtro por categoria. |
+| 📺 **Grade de verdade** | 8 dias de programação, linha do "agora", navegação no tempo com ◀ ▶, filtro por categoria e lembretes (🔔 1 min antes de começar). |
 | 🎚️ **Qualidade inteligente** | SD/HD/FHD/4K viram um canal só. Se travar, desce sozinho (4K → FHD → HD → SD) e lembra. |
 | 🌙 **Timer e faixas** | Desliga em 15–90 min; escolha de áudio e legenda (áudio em português escolhido sozinho quando existe). |
 | ▶️ **Continuar assistindo** | Filmes e episódios voltam no segundo exato. Botão "Próximo episódio" no fim e reprodução automática. |
 | 🔍 **Busca instantânea** | Busca em memória em canais, filmes e séries: 10–35 ms na TV, sem ligar para acentos. |
-| ⭐ **Favoritos e histórico** | Canais, filmes e séries favoritos. Abas "Continuar assistindo" e "Assistidos"; a capa mostra onde parou (T2 E5). |
+| ⭐ **Favoritos e histórico** | Canais, filmes e séries favoritos. Abas "Continuar assistindo" e "Assistidos"; a capa mostra onde parou (T2 E5) e as séries que você acompanha ganham o selo "Novo ep.". |
 | ⚡ **Rápido em TV fraca** | Dados num Web Worker, listas virtualizadas, abre do cache em menos de 1 segundo. |
 | 🌐 **3 idiomas** | Português (Brasil), English, Español. |
 | 🔒 **PIN para adultos** | Categorias adultas escondidas por padrão (PIN `0000`, dá para trocar). |
@@ -296,7 +296,7 @@ XC_PASS=sua_senha
 | Voltar | agora → categorias → menu | informações → sai | informações → sai |
 | 🔴 Vermelha | volta para agora | — | — |
 | 🟢 Verde | categorias | — | — |
-| 🟡 Amarela | — | opções: qualidade, áudio, legenda, timer | opções: áudio, legenda, timer |
+| 🟡 Amarela | lembrar | opções: qualidade, áudio, legenda, timer | opções: áudio, legenda, timer |
 | 🔵 Azul | favoritar | favoritar | — |
 | CH ▲▼ | — | troca de canal | — |
 | ⏪ ⏩ | — | — | −30 s / +30 s |

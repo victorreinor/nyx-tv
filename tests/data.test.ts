@@ -186,3 +186,27 @@ describe('mini-grade', () => {
     expect(cat.neighborChannel(chans[1].id, 'fav', 1)).toBe(chans[0].id);
   });
 });
+
+describe('novos episódios', () => {
+  test('selo só em série que você acompanha e que mudou depois disso', async () => {
+    const { Catalog } = await import('../src/data/catalog');
+    const { UserStore } = await import('../src/data/user');
+    const { mapSeries } = await import('../src/data/xtream');
+    const user = new UserStore();
+    const cat = new Catalog(user);
+    const series = mapSeries(
+      [
+        { series_id: 1, name: 'Acompanho', last_modified: 2000, category_id: 1 },
+        { series_id: 2, name: 'Não acompanho', last_modified: 2000, category_id: 1 },
+      ],
+      new Set(),
+    );
+    cat.setCatalog({ channels: [], movies: [], series, categories: [], at: 1 });
+    user.state.favorites['s:1'] = 1000 * 1000; // favoritou no instante 1000 s
+    expect(cat.card('series', series[0]).newEpisode).toBe(true);
+    expect(cat.card('series', series[1]).newEpisode).toBe(false);
+    expect(cat.home().newEpisodes.map((c) => c.id)).toEqual(['1']);
+    user.markSeriesSeen(1); // abriu a série agora
+    expect(cat.card('series', series[0]).newEpisode).toBe(false);
+  });
+});

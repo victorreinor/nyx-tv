@@ -181,3 +181,4 @@ html.is-playing { background: transparent; }
 .mini-row.is-playing .mini-row__name { color: var(--ring); }
 .mini-row.is-focused { background: var(--s3); border-color: var(--ring); }
 .player__wait { justify-items: center; text-align: center; max-width: 720px; padding: 18px 28px; border-radius: var(--r-panel); background: rgba(10, 10, 18, 0.8); }
+.guide-cell__bell { display: inline-block; vertical-align: -2px; margin-right: 6px; color: var(--yellow); }
