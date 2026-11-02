@@ -37,6 +37,7 @@ searches 40 thousand titles while you type.
 |---|---|
 | 📺 **Real TV guide** | 8-day EPG grid with a "now" line, time navigation with ◀ ▶ and category filters. |
 | 🎚️ **Smart quality** | SD/HD/FHD/4K variants become one channel. If a stream stalls, Nyx drops a level on its own (4K → FHD → HD → SD) and remembers it. |
+| 🌙 **Sleep timer & tracks** | Turn off in 15–90 min, dubbed/subtitled track selection (Portuguese audio picked automatically when available). |
 | ▶️ **Continue watching** | Movies and episodes resume at the exact second. "Next episode" button near the end, plus autoplay. |
 | 🔍 **Instant search** | In-memory search across channels, movies and series: 10–35 ms on the TV, accent-insensitive. |
 | ⭐ **Favorites & history** | Favorite channels, movies and series. "Continue watching" and "Watched" tabs; posters show where you stopped (S2 E5). |
@@ -140,13 +141,13 @@ XC_PASS=your_password
 
 | Key | Guide | Player (live) | Player (movie/episode) |
 |---|---|---|---|
-| ◀ ▶ | move in time | — | −10 s / +10 s (hold to speed up) |
+| ◀ ▶ | move in time | ◀ channel list | −10 s / +10 s (hold to speed up) |
 | ▲ ▼ | change channel | change channel (with debounce) | show info |
-| OK | watch | show info | pause / play |
+| OK | watch | channel list (mini guide) | pause / play |
 | Back | now → categories → menu | show info → exit | show info → exit |
 | 🔴 Red | jump to now | — | — |
 | 🟢 Green | categories | — | — |
-| 🟡 Yellow | — | quality panel | — |
+| 🟡 Yellow | — | options: quality, audio, subtitles, sleep timer | options: audio, subtitles, sleep timer |
 | 🔵 Blue | favorite | favorite | — |
 | CH ▲▼ | — | change channel | — |
 | ⏪ ⏩ | — | — | −30 s / +30 s |
@@ -214,6 +215,7 @@ junta as versões SD/HD/FHD/4K do mesmo canal, lembra exatamente onde você paro
 |---|---|
 | 📺 **Grade de verdade** | 8 dias de programação, linha do "agora", navegação no tempo com ◀ ▶ e filtro por categoria. |
 | 🎚️ **Qualidade inteligente** | SD/HD/FHD/4K viram um canal só. Se travar, desce sozinho (4K → FHD → HD → SD) e lembra. |
+| 🌙 **Timer e faixas** | Desliga em 15–90 min; escolha de áudio e legenda (áudio em português escolhido sozinho quando existe). |
 | ▶️ **Continuar assistindo** | Filmes e episódios voltam no segundo exato. Botão "Próximo episódio" no fim e reprodução automática. |
 | 🔍 **Busca instantânea** | Busca em memória em canais, filmes e séries: 10–35 ms na TV, sem ligar para acentos. |
 | ⭐ **Favoritos e histórico** | Canais, filmes e séries favoritos. Abas "Continuar assistindo" e "Assistidos"; a capa mostra onde parou (T2 E5). |
@@ -288,13 +290,13 @@ XC_PASS=sua_senha
 
 | Tecla | Grade | Player (ao vivo) | Player (filme/episódio) |
 |---|---|---|---|
-| ◀ ▶ | anda no tempo | — | −10 s / +10 s (segurar acelera) |
+| ◀ ▶ | anda no tempo | ◀ lista de canais | −10 s / +10 s (segurar acelera) |
 | ▲ ▼ | troca de canal | troca de canal (com espera) | mostra informações |
-| OK | assiste | mostra informações | pausa / continua |
+| OK | assiste | lista de canais (mini-grade) | pausa / continua |
 | Voltar | agora → categorias → menu | informações → sai | informações → sai |
 | 🔴 Vermelha | volta para agora | — | — |
 | 🟢 Verde | categorias | — | — |
-| 🟡 Amarela | — | painel de qualidade | — |
+| 🟡 Amarela | — | opções: qualidade, áudio, legenda, timer | opções: áudio, legenda, timer |
 | 🔵 Azul | favoritar | favoritar | — |
 | CH ▲▼ | — | troca de canal | — |
 | ⏪ ⏩ | — | — | −30 s / +30 s |

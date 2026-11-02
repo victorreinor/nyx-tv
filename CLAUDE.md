@@ -73,6 +73,8 @@ Teclas no navegador: setas, Enter=OK, Esc/Backspace=Voltar, F1–F4=vermelha/ver
 
 **Vídeo.** `player` (`src/player/engine.ts`) é singleton, e a camada `<object type="application/avplayer">` fica fixa no `App` (`VideoLayer`), **sempre em tela cheia**. Sair do player ou o app ir para segundo plano chama `stop()` (libera a conexão; a conta tem 2).
 
+**Player.** Teclas do canal: OK/◀ = mini-grade (`miniGuide` no worker), CH▲▼ = troca com debounce, amarela = painel de opções (qualidade, áudio, legenda, timer). Faixas via `player.tracks()/selectAudio/selectText`: a legenda embutida chega por `onSubtitle` e o app desenha. O áudio no idioma do app é escolhido sozinho (`autoAudio`). Timer: `src/player/sleep.ts` + `app/SleepWatcher.tsx` (avisa 60 s antes, depois para o vídeo e fecha o app). O player cede as teclas quando há camada isolada aberta (`trapCount()`).
+
 **Qualidade automática.** O provedor entrega cada qualidade como stream separado. `pickStart` escolhe por onde começar (salvo do canal > preferência > melhor abaixo). O `StallMonitor` decide quando trocar (não abriu em 9 s, 3 travadas por minuto ou 7 s carregando), e `nextFallback` desce primeiro e só depois sobe. A qualidade que desceu sozinha fica só na sessão.
 
 ## Receitas

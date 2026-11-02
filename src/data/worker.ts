@@ -229,6 +229,10 @@ const api = {
     return catalog.guide(category, cursor, limit, from, to);
   },
 
+  miniGuide(category: string, channelId: string, from: number, to: number) {
+    return catalog.miniGuide(category, channelId, from, to);
+  },
+
   channelRow(id: string, from: number, to: number) {
     return catalog.channelRow(id, from, to);
   },

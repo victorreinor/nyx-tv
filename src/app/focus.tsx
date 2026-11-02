@@ -51,6 +51,9 @@ type FNode = Zone | FList;
 
 const [active, setActive] = createSignal<FList | null>(null);
 export { active };
+/** Quantas camadas isoladas (modal, painel) estão abertas. O player cede as teclas quando > 0. */
+const [trapCount, setTrapCount] = createSignal(0);
+export { trapCount };
 
 /** Zona que pediu foco mas ainda não tinha itens (dados carregando). */
 let pending: Zone | null = null;
@@ -228,12 +231,14 @@ export function FocusZone(props: ZoneProps) {
     onKey: (k) => (props.onKey ? props.onKey(k) : false),
   };
   const previous = props.trap ? active() : null;
+  if (props.trap) setTrapCount(trapCount() + 1);
   if (!props.trap) parent.children.push(zone);
   if (props.ref) props.ref(zone);
   onMount(() => {
     if (props.autofocus || props.trap) focusZone(zone);
   });
   onCleanup(() => {
+    if (props.trap) setTrapCount(trapCount() - 1);
     if (!props.trap) {
       const i = parent.children.indexOf(zone);
       if (i !== -1) parent.children.splice(i, 1);

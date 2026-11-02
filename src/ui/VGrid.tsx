@@ -20,6 +20,8 @@ export interface VGridProps<T> {
   handle?: (h: ListHandle) => void;
   /** Linha focada fica nesta posição (0 = topo) ao rolar. */
   anchorRow?: number;
+  /** Item focado ao abrir. */
+  initial?: number;
   class?: string;
 }
 
@@ -31,6 +33,7 @@ export function VGrid<T>(props: VGridProps<T>) {
     axis: props.cols > 1 ? 'grid' : 'col',
     cols: () => props.cols,
     count: () => props.items().length,
+    initial: props.initial,
     autofocus: props.autofocus,
     onSelect: (i) => props.onSelect && props.onSelect(props.items()[i], i),
     onKey: (k, i) => (props.onKey ? props.onKey(k, props.items()[i], i) : false),

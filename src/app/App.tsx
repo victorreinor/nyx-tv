@@ -3,6 +3,7 @@ import { createEffect, createSignal, For, type JSX, on, onCleanup, onMount, Show
 import { Spinner } from '../ui/primitives';
 import { Toast } from '../ui/overlays';
 import { focusSidebar, isSidebarActive, Sidebar } from './Sidebar';
+import { SleepWatcher } from './SleepWatcher';
 import { VideoLayer } from '../player/VideoLayer';
 import { player } from '../player/engine';
 import { clearFocus, dispatchKey, FocusZone, focusZone, type Zone } from './focus';
@@ -146,6 +147,7 @@ export function App() {
           }}
         </For>
       </FocusZone>
+      <SleepWatcher />
       <Toast />
     </Show>
   );

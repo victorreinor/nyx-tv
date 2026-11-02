@@ -2,13 +2,15 @@
 import { createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js';
 import { call } from '../data/client';
 import type { ChannelRow, Episode, PlaySource, Quality } from '../data/types';
-import { FocusZone, pushKeyHandler } from '../app/focus';
-import { fmtClock, fmtTime, t } from '../app/i18n';
+import { FocusZone, pushKeyHandler, trapCount } from '../app/focus';
+import { fmtClock, fmtTime, type MessageKey, t } from '../app/i18n';
 import type { KeyName } from '../app/keys';
 import { back, type Media, replace } from '../app/router';
 import { settings } from '../app/settings';
 import { setLastChannel, toast } from '../app/state';
-import { FULL, player } from '../player/engine';
+import { FULL, player, type Tracks } from '../player/engine';
+import { SLEEP_OPTIONS, setSleepTimer, sleepAt, sleepChoice } from '../player/sleep';
+import { VGrid } from '../ui/VGrid';
 import { nextFallback, pickStart, StallMonitor } from '../player/quality';
 import { OptionList, type OptionItem } from '../ui/controls';
 import { Icon } from '../ui/Icon';
@@ -39,6 +41,11 @@ export function Player(props: { media: Media }) {
   const [paused, setPaused] = createSignal(false);
   const [seekTarget, setSeekTarget] = createSignal<number | null>(null);
   const [nextIn, setNextIn] = createSignal(0);
+  const [tracks, setTracks] = createSignal<Tracks>({ audio: [], text: [], audioCurrent: -1, textCurrent: -1 });
+  const [subtitle, setSubtitle] = createSignal('');
+  const [guide, setGuide] = createSignal<{ rows: ChannelRow[]; index: number } | null>(null);
+  let subTimer: ReturnType<typeof setTimeout> | undefined;
+  let audioChecked = false; // escolha automática do áudio: uma vez por stream aberto
 
   // ao vivo
   const [channelId, setChannelId] = createSignal(m.kind === 'live' ? m.channelId : '');
@@ -106,6 +113,7 @@ export function Player(props: { media: Media }) {
     tried.add(i);
     setStatus('loading');
     monitor.reset();
+    audioChecked = false;
     player.open(sources()[i].url).catch(() => fallback());
   }
 
@@ -168,6 +176,38 @@ export function Player(props: { media: Media }) {
     playSource(sources().findIndex((s) => s.quality === q));
   }
 
+  // ---------- mini-grade (OK/◀ no canal) ----------
+
+  async function openGuide() {
+    const now = Date.now() / 1000;
+    const g = await call('miniGuide', m.kind === 'live' ? m.category : 'all', channelId(), now - 60, now + 4 * 3600);
+    setGuide(g);
+  }
+
+  function pickFromGuide(id: string) {
+    setGuide(null);
+    if (id !== channelId()) openChannel(id);
+  }
+
+  // ---------- opções (amarela): áudio, legenda, timer ----------
+
+  function openOptions() {
+    setTracks(player.tracks());
+    setPanel(true);
+  }
+
+  /** Dublado por padrão: se o stream tem áudio no idioma do app, usa ele. */
+  function autoAudio() {
+    if (audioChecked) return;
+    audioChecked = true;
+    const tr = player.tracks();
+    if (import.meta.env.VITE_REPORT_URL) console.log('[tracks]', JSON.stringify(tr));
+    if (tr.audio.length < 2) return;
+    const want = settings.locale === 'pt-BR' ? 'pt' : settings.locale;
+    const match = tr.audio.find((a) => langKey(a.lang) === want);
+    if (match && match.index !== tr.audioCurrent) player.selectAudio(match.index);
+  }
+
   // ---------- filme / episódio ----------
 
   function saveProgress(force = false) {
@@ -216,6 +256,7 @@ export function Player(props: { media: Media }) {
     }
     if (!src[0]) return setStatus('error');
     vodOpenedAt = Date.now();
+    audioChecked = false;
     player.open(src[0].url, startSec * 1000).catch(() => retryVod());
   }
 
@@ -287,7 +328,7 @@ export function Player(props: { media: Media }) {
   // ---------- teclas ----------
 
   function onKey(k: KeyName): boolean {
-    if (panel()) return false; // painel de qualidade usa o foco normal
+    if (trapCount() > 0) return false; // painel/mini-grade/aviso usam o foco normal
     if (nextIn() > 0) {
       if (k === 'enter') playNextEpisode();
       else if (k === 'back') {
@@ -317,10 +358,14 @@ export function Player(props: { media: Media }) {
       else openVod(pos() / 1000);
       return true;
     }
+    if (k === 'yellow') {
+      openOptions();
+      return true;
+    }
     if (m.kind === 'live') {
-      if (k === 'chup' || k === 'up') zap(1);
+      if (k === 'enter' || k === 'left') openGuide();
+      else if (k === 'chup' || k === 'up') zap(1);
       else if (k === 'chdown' || k === 'down') zap(-1);
-      else if (k === 'yellow') setPanel(true);
       else if (k === 'blue') call('toggleFav', 'live', channelId()).then((on) => toast(on ? t('toast.favAdded') : t('toast.favRemoved')));
       return true;
     }
@@ -347,6 +392,12 @@ export function Player(props: { media: Media }) {
         vodRetries = 0;
         monitor.playing();
         setDur(player.duration());
+        autoAudio();
+      },
+      onSubtitle: (text, durationMs) => {
+        setSubtitle(text.replace(/<[^>]+>/g, ''));
+        clearTimeout(subTimer);
+        subTimer = setTimeout(() => setSubtitle(''), Math.max(800, durationMs || 3000));
       },
       onTime: (ms) => {
         if (seeking || seekTarget() !== null) return;
@@ -390,6 +441,7 @@ export function Player(props: { media: Media }) {
     clearInterval(nextTimer);
     clearInterval(watchdog);
     clearTimeout(zapTimer);
+    clearTimeout(subTimer);
     player.setEvents(null);
     player.stop();
   });
@@ -419,6 +471,20 @@ export function Player(props: { media: Media }) {
     const ep = episode();
     return ep ? `${t('common.seasonEp', { s: ep.season, e: ep.episode })}${ep.title ? ' · ' + ep.title : ''}` : '';
   };
+  const audioOptions = createMemo<OptionItem[]>(() =>
+    tracks().audio.map((a, i) => ({ id: String(a.index), label: langLabel(a.lang) || t('player.track', { n: i + 1 }) })),
+  );
+  const textOptions = createMemo<OptionItem[]>(() => [
+    { id: '-1', label: t('player.subtitlesOff') },
+    ...tracks().text.map((a, i) => ({ id: String(a.index), label: langLabel(a.lang) || t('player.track', { n: i + 1 }) })),
+  ]);
+  const sleepOptions = createMemo<OptionItem[]>(() =>
+    SLEEP_OPTIONS.map((min) => ({
+      id: String(min),
+      label: min ? `${min} min` : t('common.off'),
+      hint: min && min === sleepChoice() && sleepAt() ? t('player.sleepAt', { t: fmtTime(sleepAt()! / 1000) }) : undefined,
+    })),
+  );
   const qualityOptions = createMemo<OptionItem[]>(() => {
     const seen: Quality[] = [];
     sources().forEach((s) => s.quality && seen.indexOf(s.quality) === -1 && seen.push(s.quality));
@@ -454,7 +520,7 @@ export function Player(props: { media: Media }) {
         </div>
       </Show>
 
-      <div class="player__overlay" classList={{ 'is-hidden': !overlay() && !panel() && nextIn() === 0 }}>
+      <div class="player__overlay" classList={{ 'is-hidden': (!overlay() && !panel() && nextIn() === 0) || !!guide() }}>
         <div class="player__scrim" />
         <Show when={m.kind === 'live'}>
           <header class="player__top row g20">
@@ -531,16 +597,118 @@ export function Player(props: { media: Media }) {
         </div>
       </Show>
 
+      <Show when={subtitle()}>
+        <div class="player__subtitle">{subtitle()}</div>
+      </Show>
+
+      <Show when={guide()}>
+        <FocusZone axis="col" trap onKey={(k) => (k === 'back' || k === 'left' ? (setGuide(null), true) : false)} class="player__guide">
+          <h2 class="t-section player__guide-title">{t('player.channels')}</h2>
+          <VGrid<ChannelRow>
+            items={() => guide()!.rows}
+            initial={guide()!.index}
+            cols={1}
+            cellW={540}
+            cellH={96}
+            gapX={0}
+            gapY={8}
+            height={930}
+            anchorRow={4}
+            onSelect={(r) => pickFromGuide(r.id)}
+            render={(r, f) => <MiniGuideRow row={r} focused={f} playing={r().id === channelId()} />}
+          />
+        </FocusZone>
+      </Show>
+
       <Show when={panel()}>
         <FocusZone axis="col" trap onKey={(k) => (k === 'back' || k === 'yellow' ? (setPanel(false), true) : false)} class="player__panel stack g12">
           <div class="row g12">
             <span class="colorkey colorkey--yellow" />
-            <h2 class="t-section">{t('player.quality')}</h2>
+            <h2 class="t-section">{t('player.options')}</h2>
           </div>
-          <OptionList items={qualityOptions} selected={() => manual() || 'auto'} onSelect={(id) => chooseQuality(id as Quality | 'auto')} />
-          <span class="t-caption c-3">{t('player.savedForChannel')}</span>
+          <Show when={m.kind === 'live' && qualityOptions().length > 1}>
+            <span class="t-micro c-3 player__panel-label">{t('player.quality')}</span>
+            <OptionList items={qualityOptions} selected={() => manual() || 'auto'} onSelect={(id) => chooseQuality(id as Quality | 'auto')} />
+          </Show>
+          <Show when={tracks().audio.length > 1}>
+            <span class="t-micro c-3 player__panel-label">{t('player.audio')}</span>
+            <OptionList
+              items={audioOptions}
+              selected={() => String(tracks().audioCurrent)}
+              onSelect={(id) => {
+                player.selectAudio(Number(id));
+                setTracks({ ...tracks(), audioCurrent: Number(id) });
+              }}
+            />
+          </Show>
+          <Show when={tracks().text.length > 0}>
+            <span class="t-micro c-3 player__panel-label">{t('player.subtitles')}</span>
+            <OptionList
+              items={textOptions}
+              selected={() => String(tracks().textCurrent)}
+              onSelect={(id) => {
+                player.selectText(Number(id));
+                if (Number(id) < 0) setSubtitle('');
+                setTracks({ ...tracks(), textCurrent: Number(id) });
+              }}
+            />
+          </Show>
+          <span class="t-micro c-3 player__panel-label">{t('player.sleep')}</span>
+          <OptionList
+            axis="row"
+            class="player__sleep"
+            items={sleepOptions}
+            selected={() => String(sleepChoice())}
+            onSelect={(id) => {
+              setSleepTimer(Number(id));
+              if (Number(id) > 0) toast(t('player.sleepSet', { t: fmtTime(sleepAt()! / 1000) }));
+            }}
+          />
         </FocusZone>
       </Show>
     </div>
   );
+}
+
+/** Linha da mini-grade: logo, número, nome, agora (com andamento) e a seguir. */
+function MiniGuideRow(props: { row: () => ChannelRow; focused: () => boolean; playing: boolean }) {
+  const now = () => Date.now() / 1000;
+  const cur = () => props.row().programs.find((p) => p.start <= now() && p.stop > now());
+  const next = () => props.row().programs.find((p) => p.start > now());
+  return (
+    <div class="mini-row" classList={{ 'is-focused': props.focused(), 'is-playing': props.playing }}>
+      <Img class="mini-row__logo" src={props.row().logo} alt={props.row().name} />
+      <div class="stack g4 grow" style={{ 'min-width': 0 }}>
+        <span class="mini-row__name ellipsis">
+          {props.row().num < 99999 ? props.row().num + ' · ' : ''}
+          {props.row().name}
+        </span>
+        <span class="mini-row__now ellipsis">{cur() ? cur()!.title : t('live.noGuide')}</span>
+        <Show when={cur()}>
+          <ProgressBar value={(now() - cur()!.start) / (cur()!.stop - cur()!.start)} tone="live" height={3} />
+        </Show>
+        <Show when={props.focused() && next()}>
+          <span class="mini-row__next ellipsis">
+            {fmtTime(next()!.start)} · {next()!.title}
+          </span>
+        </Show>
+      </div>
+      <Show when={props.playing}>
+        <Icon name="play" size={22} color="var(--ring)" />
+      </Show>
+    </div>
+  );
+}
+
+/** "por"/"pt"/"pt-BR" → "pt". */
+function langKey(code: string): string {
+  const c = (code || '').toLowerCase();
+  const map: Record<string, string> = { por: 'pt', pt: 'pt', eng: 'en', en: 'en', spa: 'es', es: 'es', fre: 'fr', fra: 'fr', fr: 'fr', ita: 'it', it: 'it', ger: 'de', deu: 'de', de: 'de', jpn: 'ja', ja: 'ja', kor: 'ko', ko: 'ko' };
+  return map[c] || map[c.slice(0, 2)] || map[c.slice(0, 3)] || c;
+}
+
+function langLabel(code: string): string {
+  const k = langKey(code);
+  if (!k) return '';
+  return ['pt', 'en', 'es', 'fr', 'it', 'de', 'ja', 'ko'].indexOf(k) !== -1 ? t(('lang.' + k) as MessageKey) : k.toUpperCase();
 }

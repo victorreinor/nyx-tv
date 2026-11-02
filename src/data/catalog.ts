@@ -290,6 +290,17 @@ export class Catalog {
     return { items: (items as Channel[]).map((ch) => this.row(ch, from, to)), next, total: list.length };
   }
 
+  /** Mini-grade do player: canais da categoria só com agora/a seguir + posição do canal atual. */
+  miniGuide(category: string, channelId: string, from: number, to: number): { rows: ChannelRow[]; index: number } {
+    const list = this.list('live', category, 'num') as Channel[];
+    const rows = list.map((ch) => {
+      const r = this.row(ch, from, to);
+      r.programs = r.programs.slice(0, 2);
+      return r;
+    });
+    return { rows, index: Math.max(0, list.findIndex((c) => c.id === channelId)) };
+  }
+
   channelRow(id: string, from: number, to: number): ChannelRow | null {
     const ch = this.channelById.get(id);
     return ch ? this.row(ch, from, to) : null;

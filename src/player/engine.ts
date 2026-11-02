@@ -10,6 +10,21 @@ export interface EngineEvents {
   onTime: (ms: number) => void;
   onEnd: () => void;
   onError: (msg: string) => void;
+  /** Legenda embutida: o AVPlay entrega o texto e o app desenha. */
+  onSubtitle?: (text: string, durationMs: number) => void;
+}
+
+/** Faixa de áudio ou legenda do stream. `lang` é o código ISO que o stream informar (pode vir vazio). */
+export interface Track {
+  index: number;
+  lang: string;
+}
+
+export interface Tracks {
+  audio: Track[];
+  text: Track[];
+  audioCurrent: number;
+  textCurrent: number; // -1 = legenda desligada
 }
 
 export interface Rect {
@@ -37,6 +52,19 @@ interface AVPlay {
   getCurrentTime(): number;
   getDuration(): number;
   getState(): string;
+  getTotalTrackInfo?(): { index: number; type: string; extra_info: string }[];
+  getCurrentStreamInfo?(): { index: number; type: string }[];
+  setSelectTrack?(type: string, index: number): void;
+  setSilentSubtitle?(silent: boolean): void;
+}
+
+function parseLang(extra: string): string {
+  try {
+    const info = JSON.parse(extra || '{}');
+    return String(info.language || info.track_lang || info.lang || '').toLowerCase();
+  } catch {
+    return '';
+  }
 }
 
 function avplay(): AVPlay | null {
@@ -63,6 +91,7 @@ const [currentUrl, setCurrentUrl] = createSignal('');
 export { currentUrl, rect };
 
 let events: EngineEvents = noop;
+let subtitleOn = false;
 
 let opened = 0;
 let video: HTMLVideoElement | undefined;
@@ -93,6 +122,7 @@ export const player = {
   open(url: string, startMs = 0): Promise<void> {
     const mine = ++opened;
     setCurrentUrl(url);
+    subtitleOn = false;
     const av = avplay();
     if (!av) {
       if (!video) return Promise.reject(new Error('sem player disponível'));
@@ -116,6 +146,7 @@ export const player = {
           onstreamcompleted: () => mine === opened && events.onEnd(),
           onerror: (e: unknown) => mine === opened && events.onError(String(e)),
           onevent: () => undefined,
+          onsubtitlechange: (duration: number, text: string) => mine === opened && events.onSubtitle && events.onSubtitle(String(text || ''), Number(duration) || 0),
         });
         av.prepareAsync(
           () => {
@@ -176,6 +207,35 @@ export const player = {
       };
       v.currentTime = target / 1000;
     });
+  },
+
+  /** Faixas do stream atual (AVPlay). No navegador do Mac não há faixas. */
+  tracks(): Tracks {
+    const empty: Tracks = { audio: [], text: [], audioCurrent: -1, textCurrent: -1 };
+    const av = avplay();
+    if (!av || !av.getTotalTrackInfo) return empty;
+    const all = safe(() => av.getTotalTrackInfo!(), []);
+    const cur = safe(() => (av.getCurrentStreamInfo ? av.getCurrentStreamInfo() : []), []);
+    const pick = (type: string) => all.filter((t) => t.type === type).map((t) => ({ index: Number(t.index), lang: parseLang(t.extra_info) }));
+    const curOf = (type: string) => {
+      const c = cur.find((t) => t.type === type);
+      return c ? Number(c.index) : -1;
+    };
+    return { audio: pick('AUDIO'), text: pick('TEXT'), audioCurrent: curOf('AUDIO'), textCurrent: subtitleOn ? curOf('TEXT') : -1 };
+  },
+
+  selectAudio(index: number) {
+    const av = avplay();
+    if (av && av.setSelectTrack) safe(() => av.setSelectTrack!('AUDIO', index), undefined);
+  },
+
+  /** Liga a legenda da faixa `index`, ou desliga com -1. */
+  selectText(index: number) {
+    const av = avplay();
+    if (!av) return;
+    subtitleOn = index >= 0;
+    if (index >= 0 && av.setSelectTrack) safe(() => av.setSelectTrack!('TEXT', index), undefined);
+    if (av.setSilentSubtitle) safe(() => av.setSilentSubtitle!(index < 0), undefined);
   },
 
   time(): number {

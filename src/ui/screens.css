@@ -84,7 +84,7 @@
 .player__timeline .progress { align-self: center; }
 .player__hint { justify-self: end; }
 .player__next { position: absolute; z-index: 4; right: var(--safe-x); bottom: 200px; width: 520px; padding: 28px; border-radius: var(--r-panel); background: var(--s1); border: 4px solid var(--ring); }
-.player__panel { position: absolute; z-index: 5; top: 200px; right: var(--safe-x); width: 480px; padding: 28px; border-radius: var(--r-panel); background: var(--s1); border: 1px solid var(--line); }
+.player__panel { position: absolute; z-index: 5; top: 200px; right: var(--safe-x); width: 580px; padding: 28px; border-radius: var(--r-panel); background: var(--s1); border: 1px solid var(--line); }
 
 /* ---------- Filmes / Séries ---------- */
 .browse { position: absolute; top: 0; right: 0; bottom: 0; left: 0; padding: 48px var(--safe-x) 0 72px; }
@@ -162,3 +162,21 @@ object.video-layer { background: transparent; }
 /* tela cheia: a página fica transparente para o vídeo (camada de baixo) aparecer */
 html.is-playing { background: transparent; }
 .video-layer--full { left: 0; top: 0; width: 1920px; height: 1080px; }
+
+/* ---------- player: opções, legenda, mini-grade ---------- */
+.player__panel { max-height: 760px; overflow: hidden; }
+.player__panel-label { margin-top: 8px; }
+.player__sleep { grid-auto-flow: column; justify-content: start; }
+.player__sleep .option { min-height: 56px; padding: 8px 14px; white-space: nowrap; }
+.player__subtitle { position: absolute; z-index: 4; left: 50%; bottom: 120px; transform: translateX(-50%); max-width: 1500px; padding: 8px 20px; border-radius: 10px; background: rgba(5, 5, 10, 0.72); font-size: 40px; font-weight: 700; line-height: 1.3; text-align: center; white-space: pre-line; }
+.player__guide { position: absolute; z-index: 5; top: 0; bottom: 0; left: 0; width: 640px; padding: 48px 40px 0 56px; background: rgba(10, 10, 18, 0.94); border-right: 1px solid var(--line); }
+.player__guide-title { margin-bottom: 20px; }
+.mini-row { display: flex; align-items: center; height: 96px; padding: 0 18px; border-radius: 14px; border: 3px solid transparent; }
+.mini-row > * + * { margin-left: 16px; }
+.mini-row__logo { width: 60px; height: 60px; border-radius: 12px; background: var(--s3); object-fit: contain; padding: 6px; flex-shrink: 0; }
+.mini-row .img-fallback.mini-row__logo { font-size: 16px; }
+.mini-row__name { font-size: 22px; font-weight: 700; }
+.mini-row__now { font-size: 18px; color: var(--t2); }
+.mini-row__next { font-size: 16px; color: var(--t3); }
+.mini-row.is-playing .mini-row__name { color: var(--ring); }
+.mini-row.is-focused { background: var(--s3); border-color: var(--ring); }
