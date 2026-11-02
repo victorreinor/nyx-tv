@@ -2,7 +2,9 @@
 import { createEffect, createSignal, For, type JSX, on, onCleanup, onMount, Show } from 'solid-js';
 import { Spinner } from '../ui/primitives';
 import { Toast } from '../ui/overlays';
-import { Sidebar } from './Sidebar';
+import { focusSidebar, isSidebarActive, Sidebar } from './Sidebar';
+import { VideoLayer } from '../player/VideoLayer';
+import { player, stopPreview } from '../player/engine';
 import { clearFocus, dispatchKey, FocusZone, focusZone, type Zone } from './focus';
 import { t } from './i18n';
 import { exitApp, keyName, registerTizenKeys } from './keys';
@@ -74,6 +76,8 @@ export function App() {
     }
     if (dispatchKey(k)) return;
     if (k !== 'back') return;
+    // seção: conteúdo → menu → Início → sair
+    if (isSection(top()) && !isSidebarActive() && focusSidebar()) return;
     if (back()) return;
     if (top().name !== 'home' && isSection(top())) return goSection('home');
     if (Date.now() - lastBack < 2000) return exitApp();
@@ -81,8 +85,17 @@ export function App() {
     toast(t('toast.exit'));
   };
 
+  // App foi para segundo plano (botão Home, outro app): fecha o vídeo e libera a conexão.
+  const onVisibility = () => {
+    if (!document.hidden) return;
+    stopPreview();
+    if (top().name === 'player') back();
+    player.stop();
+  };
+
   onMount(async () => {
     document.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener('visibilitychange', onVisibility);
     registerTizenKeys();
     seedPlaylist();
     if (!activePlaylist()) reset({ name: 'welcome' });
@@ -95,7 +108,10 @@ export function App() {
     }
     setBooted(true);
   });
-  onCleanup(() => document.removeEventListener('keydown', onKeyDown, true));
+  onCleanup(() => {
+    document.removeEventListener('keydown', onKeyDown, true);
+    document.removeEventListener('visibilitychange', onVisibility);
+  });
 
   // Trocou de tela: o foco vai para a tela do topo (onde ela estava, se já existia).
   createEffect(
@@ -114,6 +130,7 @@ export function App() {
 
   return (
     <Show when={booted()} fallback={<Splash />}>
+      <VideoLayer />
       <Sidebar enabled={showSidebar} />
       <FocusZone axis="col" class="screens" classList={{ 'screens--rail': showSidebar() }}>
         <For each={stack()}>

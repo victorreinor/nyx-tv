@@ -1,19 +1,20 @@
 // Player em tela cheia: canal ao vivo (qualidade automática) ou filme/episódio (progresso salvo).
-import { createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js';
+// O vídeo é o motor único do app (src/player/engine.ts): ao voltar de um canal para a grade,
+// ele continua tocando na caixinha de prévia em vez de fechar.
+import { createMemo, createSignal, onCleanup, onMount, Show, untrack } from 'solid-js';
 import { call } from '../data/client';
 import type { ChannelRow, Episode, PlaySource, Quality } from '../data/types';
-import { pushKeyHandler } from '../app/focus';
+import { FocusZone, pushKeyHandler } from '../app/focus';
 import { fmtClock, fmtTime, t } from '../app/i18n';
 import type { KeyName } from '../app/keys';
-import { back, type Media, replace } from '../app/router';
+import { back, type Media, replace, top } from '../app/router';
 import { settings } from '../app/settings';
 import { toast } from '../app/state';
-import { createEngine, type Engine, hasNativePlayer } from '../player/engine';
+import { adoptPreview, currentUrl, FULL, player, startPreview } from '../player/engine';
 import { nextFallback, pickStart, StallMonitor } from '../player/quality';
 import { OptionList, type OptionItem } from '../ui/controls';
 import { Icon } from '../ui/Icon';
 import { Badge, Img, LiveBadge, ProgressBar, Spinner } from '../ui/primitives';
-import { FocusZone } from '../app/focus';
 import { useClock } from '../ui/useClock';
 
 /** Qualidade que desceu sozinha nesta sessão do app (não é salva: amanhã tenta de novo a melhor). */
@@ -22,12 +23,11 @@ const learned = new Map<string, Quality>();
 const SAVE_EVERY_MS = 10000;
 const OVERLAY_MS = 5000;
 const NEXT_EPISODE_S = 8;
+const SEEK_COMMIT_MS = 700;
 
 export function Player(props: { media: Media }) {
   const m = props.media;
   const clock = useClock(30000);
-  let video: HTMLVideoElement | undefined;
-  let engine: Engine | undefined;
 
   const [status, setStatus] = createSignal<'loading' | 'playing' | 'buffering' | 'error'>('loading');
   const [overlay, setOverlay] = createSignal(true);
@@ -51,6 +51,8 @@ export function Player(props: { media: Media }) {
   const epIndex = () => (m.kind === 'episode' ? m.index : 0);
   const episode = (): Episode | null => (m.kind === 'episode' ? m.episodes[epIndex()] || null : null);
   let lastSave = 0;
+  let seeking = false; // entre o salto e o vídeo voltar a andar
+  let seekSteps = 0; // segurar a seta acelera os saltos
 
   let overlayTimer: ReturnType<typeof setTimeout> | undefined;
   let seekTimer: ReturnType<typeof setTimeout> | undefined;
@@ -60,16 +62,18 @@ export function Player(props: { media: Media }) {
   function showOverlay() {
     setOverlay(true);
     clearTimeout(overlayTimer);
-    overlayTimer = setTimeout(() => !paused() && status() === 'playing' && setOverlay(false), OVERLAY_MS);
+    overlayTimer = setTimeout(() => !paused() && status() === 'playing' && seekTarget() === null && setOverlay(false), OVERLAY_MS);
   }
 
   // ---------- ao vivo ----------
 
   async function openChannel(id: string) {
     setChannelId(id);
-    setStatus('loading');
     showOverlay();
     call('touchChannel', id);
+    // veio da prévia da grade com o mesmo canal: só volta para tela cheia
+    const adopted = adoptPreview(id);
+    setStatus(adopted ? 'playing' : 'loading');
     const now = Date.now() / 1000;
     const [src, saved, r] = await Promise.all([
       call('sources', 'live', id, settings.streamFormat),
@@ -81,11 +85,19 @@ export function Player(props: { media: Media }) {
     setSources(src);
     setManual(saved);
     tried = new Set();
+    if (adopted) {
+      const i = src.findIndex((s) => s.url === currentUrl());
+      setSrcIndex(i);
+      tried.add(i);
+      monitor.reset();
+      monitor.playing();
+      return;
+    }
     playSource(pickStart(src, settings.quality, saved || learned.get(id) || null));
   }
 
   function playSource(i: number) {
-    if (i < 0 || !engine) {
+    if (i < 0) {
       setStatus('error');
       return;
     }
@@ -93,7 +105,7 @@ export function Player(props: { media: Media }) {
     tried.add(i);
     setStatus('loading');
     monitor.reset();
-    engine.open(sources()[i].url).catch(() => fallback());
+    player.open(sources()[i].url).catch(() => fallback());
   }
 
   /** Qualidade atual não aguentou: tenta a próxima (desce primeiro). */
@@ -175,7 +187,6 @@ export function Player(props: { media: Media }) {
   }
 
   async function openVod(startSec: number) {
-    if (!engine) return;
     setStatus('loading');
     setPos(startSec * 1000);
     setDur(0);
@@ -189,7 +200,7 @@ export function Player(props: { media: Media }) {
       src = await call('sources', 'episode', ep.id, settings.streamFormat, ep.ext, ep.url || '');
     }
     if (!src[0]) return setStatus('error');
-    engine.open(src[0].url, startSec * 1000).catch(() => setStatus('error'));
+    player.open(src[0].url, startSec * 1000).catch(() => setStatus('error'));
   }
 
   function onEnded() {
@@ -216,22 +227,29 @@ export function Player(props: { media: Media }) {
     replace({ name: 'player', media: { ...m, index: i, position: 0 } });
   }
 
-  function seekBy(deltaSec: number) {
-    const base = seekTarget() !== null ? seekTarget()! : pos();
-    const target = Math.max(0, Math.min(dur() || Infinity, base + deltaSec * 1000));
+  /** Acumula os saltos enquanto a seta é segurada; só busca no vídeo quando solta. */
+  function seekBy(direction: 1 | -1, base: number) {
+    seekSteps++;
+    const step = seekSteps > 40 ? 120 : seekSteps > 20 ? 60 : seekSteps > 8 ? 30 : base;
+    const from = seekTarget() !== null ? seekTarget()! : pos();
+    const target = Math.max(0, Math.min(dur() ? dur() - 2000 : Infinity, from + direction * step * 1000));
     setSeekTarget(target);
     clearTimeout(seekTimer);
-    seekTimer = setTimeout(() => {
-      if (engine) engine.seek(target);
+    seekTimer = setTimeout(async () => {
+      seekSteps = 0;
+      seeking = true;
+      setStatus('loading');
       setPos(target);
+      await player.seek(target);
       setSeekTarget(null);
-    }, 600);
+      seeking = false;
+      // continua "carregando" até o primeiro avanço de tempo depois do salto
+    }, SEEK_COMMIT_MS);
   }
 
   function togglePause() {
-    if (!engine) return;
-    if (paused()) engine.play();
-    else engine.pause();
+    if (paused()) player.play();
+    else player.pause();
     setPaused(!paused());
     showOverlay();
   }
@@ -270,50 +288,46 @@ export function Player(props: { media: Media }) {
     if (k === 'enter' || k === 'playpause') togglePause();
     else if (k === 'play' && paused()) togglePause();
     else if (k === 'pause' && !paused()) togglePause();
-    else if (k === 'left') seekBy(-10);
-    else if (k === 'right') seekBy(10);
-    else if (k === 'rw') seekBy(-30);
-    else if (k === 'ff') seekBy(30);
+    else if (k === 'left') seekBy(-1, 10);
+    else if (k === 'right') seekBy(1, 10);
+    else if (k === 'rw') seekBy(-1, 30);
+    else if (k === 'ff') seekBy(1, 30);
     return true;
   }
 
   onMount(() => {
-    try {
-      engine = createEngine(
-        {
-          onBuffering: () => {
-            setStatus('buffering');
-            monitor.buffering();
-          },
-          onPlaying: () => {
-            setStatus('playing');
-            monitor.playing();
-            if (engine) setDur(engine.duration());
-          },
-          onTime: (ms) => {
-            if (seekTarget() === null) setPos(ms);
-            if (status() !== 'playing') {
-              setStatus('playing');
-              monitor.playing();
-            }
-            if (!dur() && engine) setDur(engine.duration());
-            saveProgress();
-          },
-          onEnd: onEnded,
-          onError: () => (m.kind === 'live' ? fallback() : setStatus('error')),
-        },
-        video,
-      );
-    } catch {
-      setStatus('error');
-      return;
-    }
+    player.setRect(FULL);
+    player.setEvents({
+      onBuffering: () => {
+        setStatus('buffering');
+        monitor.buffering();
+      },
+      onPlaying: () => {
+        if (seeking) return;
+        setStatus('playing');
+        monitor.playing();
+        setDur(player.duration());
+      },
+      onTime: (ms) => {
+        if (seeking || seekTarget() !== null) return;
+        setPos(ms);
+        if (status() !== 'playing') {
+          setStatus('playing');
+          monitor.playing();
+          showOverlay();
+        }
+        if (!dur()) setDur(player.duration());
+        saveProgress();
+      },
+      onEnd: onEnded,
+      onError: () => (m.kind === 'live' ? fallback() : setStatus('error')),
+    });
     const pop = pushKeyHandler(onKey);
     onCleanup(pop);
     if (m.kind === 'live') openChannel(m.channelId);
     else openVod(m.position || 0);
     watchdog = setInterval(() => {
-      if (status() === 'error') return;
+      if (status() === 'error' || seeking) return;
       const v = monitor.verdict();
       if (!v) return;
       if (m.kind === 'live' && (settings.autoQuality || v === 'startup')) fallback();
@@ -327,7 +341,13 @@ export function Player(props: { media: Media }) {
     clearTimeout(seekTimer);
     clearInterval(nextTimer);
     clearInterval(watchdog);
-    if (engine) engine.stop();
+    // voltou de um canal para a grade: o vídeo segue na caixinha de prévia
+    const dest = untrack(top);
+    if (m.kind === 'live' && dest.name === 'live' && status() !== 'error' && currentUrl()) startPreview({ channelId: channelId(), category: m.category });
+    else {
+      player.setEvents(null);
+      player.stop();
+    }
   });
 
   // ---------- visual ----------
@@ -344,6 +364,7 @@ export function Player(props: { media: Media }) {
   });
   const quality = () => (sources()[srcIndex()] ? sources()[srcIndex()].quality : '');
   const shownPos = () => (seekTarget() !== null ? seekTarget()! : pos());
+  const seekDelta = () => (seekTarget() !== null ? (seekTarget()! - pos()) / 1000 : 0);
   const vodTitle = () => (m.kind === 'movie' ? m.title : m.kind === 'episode' ? m.seriesTitle : '');
   const vodSub = () => {
     const ep = episode();
@@ -360,11 +381,18 @@ export function Player(props: { media: Media }) {
 
   return (
     <div class="player">
-      <Show when={hasNativePlayer()} fallback={<video ref={video} class="player__video" autoplay />}>
-        <object type="application/avplayer" class="player__video" />
+      <Show when={seekTarget() !== null}>
+        <div class="player__center">
+          <div class="player__seek stack g8">
+            <span class="player__seek-time">{fmtClock(seekTarget()! / 1000)}</span>
+            <span class="player__seek-delta">
+              {seekDelta() >= 0 ? '+' : '−'}
+              {fmtClock(Math.abs(seekDelta()))}
+            </span>
+          </div>
+        </div>
       </Show>
-
-      <Show when={status() === 'loading' || status() === 'buffering'}>
+      <Show when={seekTarget() === null && (status() === 'loading' || status() === 'buffering')}>
         <div class="player__center">
           <Spinner size={72} />
         </div>

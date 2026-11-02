@@ -43,6 +43,12 @@ export function Browse(props: { kind: 'movie' | 'series' }) {
   );
 
   const onKey = (k: string, item?: CardItem): boolean => {
+    // voltar na grade → categorias (de lá, voltar vai para o menu)
+    if (k === 'back' && item) {
+      const c = chipsHandle();
+      if (c) c.focus(Math.max(0, chips().findIndex((x) => x.id === category())));
+      return true;
+    }
     if (k === 'red') {
       setSort(SORTS[(SORTS.indexOf(sort()) + 1) % SORTS.length]);
       toast(t('sort.label', { s: t(('sort.' + sort()) as MessageKey) }));

@@ -1,5 +1,5 @@
 // TV ao vivo: grade de programação. ◀ ▶ andam no tempo, ▲ ▼ trocam de canal, OK assiste.
-import { createEffect, createMemo, createResource, createSignal, For, on, Show } from 'solid-js';
+import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js';
 import { call } from '../data/client';
 import type { ChannelRow, Program } from '../data/types';
 import { FocusZone, type ListHandle } from '../app/focus';
@@ -7,6 +7,8 @@ import { fmtDay, fmtTime, t } from '../app/i18n';
 import { playChannel } from '../app/play';
 import { usePaged } from '../app/paged';
 import { dataVersion, toast } from '../app/state';
+import { top } from '../app/router';
+import { player, preview, stopPreview } from '../player/engine';
 import { ChipRow, type ChipItem } from '../ui/controls';
 import { Img, LiveBadge, QualityBadges, ColorKeys } from '../ui/primitives';
 import { VGrid } from '../ui/VGrid';
@@ -50,14 +52,18 @@ export function Live() {
     () => [category(), range(), dataVersion()],
   );
 
-  // Ao abrir, o foco vai direto para a grade (não para as categorias).
-  createEffect(
-    on(rows.loaded, (loaded) => {
-      const c = chips();
-      const g = grid();
-      if (loaded && g && c && c.isActive() && rows.items().length) g.focus(0);
-    }),
-  );
+  // Prévia: o canal que você estava vendo continua na caixinha até escolher outro.
+  let thumb: HTMLDivElement | undefined;
+  const isTop = () => top().name === 'live';
+  const showPreview = () => !!preview() && isTop();
+  createEffect(() => {
+    if (!showPreview() || !thumb) return;
+    const r = thumb.getBoundingClientRect(); // uma medição por prévia, não por tecla
+    player.setRect({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
+  });
+  const [previewRow] = createResource(preview, (p) => call('channelRow', p.channelId, Date.now() / 1000, Date.now() / 1000 + 60));
+  // saiu da TV ao vivo (outra seção): fecha o vídeo e libera a conexão
+  onCleanup(stopPreview);
 
   const focusedRow = () => {
     const g = grid();
@@ -80,6 +86,11 @@ export function Live() {
   }
 
   function onGridKey(k: string, row: ChannelRow): boolean {
+    if (k === 'back') {
+      const c = chips();
+      if (c) c.focus(Math.max(0, chipItems().findIndex((x) => x.id === category())));
+      return true;
+    }
     if (k === 'left' || k === 'right') {
       const list = row.programs;
       const i = programAt(list, cursor());
@@ -134,14 +145,28 @@ export function Live() {
             </Show>
           </Show>
         </div>
-        <div class="live__thumb">
-          <Show when={focusedRow()}>
-            <Img class="live__thumb-logo" src={focusedRow()!.logo} alt={focusedRow()!.name} />
-          </Show>
-          <Show when={focusedProgram() && focusedProgram()!.start <= nowSec()}>
+        <div class="live__thumb" classList={{ 'has-video': showPreview() }} ref={thumb}>
+          <Show
+            when={showPreview()}
+            fallback={
+              <>
+                <Show when={focusedRow()}>
+                  <Img class="live__thumb-logo" src={focusedRow()!.logo} alt={focusedRow()!.name} />
+                </Show>
+                <Show when={focusedProgram() && focusedProgram()!.start <= nowSec()}>
+                  <span class="live__thumb-badge">
+                    <LiveBadge label={t('live.liveBadge')} />
+                  </span>
+                </Show>
+              </>
+            }
+          >
             <span class="live__thumb-badge">
               <LiveBadge label={t('live.liveBadge')} />
             </span>
+            <Show when={previewRow()}>
+              <span class="live__thumb-caption">▶ {previewRow()!.name}</span>
+            </Show>
           </Show>
         </div>
       </section>

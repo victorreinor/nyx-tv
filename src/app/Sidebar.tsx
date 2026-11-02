@@ -1,7 +1,7 @@
 // Menu lateral: trilho de ícones que abre os nomes quando recebe o foco.
 import { createEffect, For, on } from 'solid-js';
 import { Icon, type IconName, Logo } from '../ui/Icon';
-import { useList } from './focus';
+import { type ListHandle, useList } from './focus';
 import { type MessageKey, t } from './i18n';
 import { goSection, isSection, type Section, SECTIONS, stack } from './router';
 
@@ -14,6 +14,19 @@ const ICONS: Record<Section, IconName> = {
   favorites: 'favorites',
   settings: 'settings',
 };
+
+let handle: ListHandle | null = null;
+
+/** Voltar a partir do conteúdo de uma seção leva ao menu. */
+export function focusSidebar(): boolean {
+  if (!handle || handle.isActive()) return false;
+  handle.focus();
+  return handle.isActive();
+}
+
+export function isSidebarActive(): boolean {
+  return !!handle && handle.isActive();
+}
 
 export function Sidebar(props: { enabled: () => boolean }) {
   const current = (): Section => {
@@ -28,6 +41,7 @@ export function Sidebar(props: { enabled: () => boolean }) {
     initial: SECTIONS.indexOf('home'),
     onSelect: (i) => goSection(SECTIONS[i]),
   });
+  handle = list;
   // Ao entrar no menu, o foco começa na seção atual.
   createEffect(on(list.isActive, (a) => a && list.setIndex(SECTIONS.indexOf(current()))));
 

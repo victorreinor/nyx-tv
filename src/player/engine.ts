@@ -1,5 +1,10 @@
-// Motor de vídeo: AVPlay (decodificação por hardware da Samsung) na TV,
+// Motor de vídeo ÚNICO do app: AVPlay (decodificação por hardware da Samsung) na TV,
 // <video> HTML5 no navegador do Mac (só para desenvolver a interface).
+//
+// É um singleton porque o AVPlay é um só e porque o vídeo sobrevive entre telas:
+// ao voltar do player para a grade, o canal continua tocando na caixinha de prévia
+// (só muda o retângulo de exibição; nada é reaberto).
+import { createSignal } from 'solid-js';
 
 export interface EngineEvents {
   onBuffering: () => void;
@@ -9,16 +14,16 @@ export interface EngineEvents {
   onError: (msg: string) => void;
 }
 
-export interface Engine {
-  open(url: string, startMs?: number): Promise<void>;
-  play(): void;
-  pause(): void;
-  stop(): void;
-  seek(ms: number): void;
-  time(): number;
-  duration(): number;
-  paused(): boolean;
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
+
+export const FULL: Rect = { x: 0, y: 0, w: 1920, h: 1080 };
+
+const noop: EngineEvents = { onBuffering() {}, onPlaying() {}, onTime() {}, onEnd() {}, onError() {} };
 
 interface AVPlay {
   open(url: string): void;
@@ -27,11 +32,10 @@ interface AVPlay {
   play(): void;
   pause(): void;
   prepareAsync(ok: () => void, err: (e: unknown) => void): void;
-  seekTo(ms: number, ok?: () => void, err?: () => void): void;
+  seekTo(ms: number, ok?: () => void, err?: (e: unknown) => void): void;
   setDisplayRect(x: number, y: number, w: number, h: number): void;
   setDisplayMethod(m: string): void;
   setListener(l: Record<string, (...a: any[]) => void>): void;
-  setTimeoutForBuffering?(s: number): void;
   getCurrentTime(): number;
   getDuration(): number;
   getState(): string;
@@ -46,113 +50,177 @@ export function hasNativePlayer(): boolean {
   return !!avplay();
 }
 
-function createAVPlayEngine(av: AVPlay, ev: EngineEvents): Engine {
-  let opened = 0;
-  const safe = (fn: () => void) => {
-    try {
-      fn();
-    } catch {
-      // estado inválido do AVPlay (ex.: stop num player já fechado)
-    }
-  };
-  return {
-    open(url, startMs) {
-      const mine = ++opened;
-      safe(() => av.stop());
-      safe(() => av.close());
-      return new Promise((resolve, reject) => {
-        try {
-          av.open(url);
-          av.setDisplayRect(0, 0, 1920, 1080);
-          av.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX');
-          av.setListener({
-            onbufferingstart: () => mine === opened && ev.onBuffering(),
-            onbufferingprogress: () => undefined,
-            onbufferingcomplete: () => mine === opened && ev.onPlaying(),
-            oncurrentplaytime: (ms: number) => mine === opened && ev.onTime(ms),
-            onstreamcompleted: () => mine === opened && ev.onEnd(),
-            onerror: (e: unknown) => mine === opened && ev.onError(String(e)),
-            onevent: () => undefined,
-          });
-          av.prepareAsync(
-            () => {
-              if (mine !== opened) return resolve();
-              const start = () => {
-                safe(() => av.play());
-                ev.onPlaying();
-                resolve();
-              };
-              if (startMs && startMs > 0) av.seekTo(startMs, start, start);
-              else start();
-            },
-            (e) => reject(new Error(String(e))),
-          );
-        } catch (e) {
-          reject(e instanceof Error ? e : new Error(String(e)));
-        }
-      });
-    },
-    play: () => safe(() => av.play()),
-    pause: () => safe(() => av.pause()),
-    stop() {
-      opened++;
-      safe(() => av.stop());
-      safe(() => av.close());
-    },
-    seek: (ms) => safe(() => av.seekTo(Math.max(0, ms))),
-    time: () => {
-      try {
-        return av.getCurrentTime();
-      } catch {
-        return 0;
-      }
-    },
-    duration: () => {
-      try {
-        return av.getDuration();
-      } catch {
-        return 0;
-      }
-    },
-    paused: () => {
-      try {
-        return av.getState() === 'PAUSED';
-      } catch {
-        return false;
-      }
-    },
-  };
+function safe<T>(fn: () => T, fallback: T): T {
+  try {
+    return fn();
+  } catch {
+    return fallback; // estado inválido do AVPlay (ex.: stop num player já fechado)
+  }
 }
 
-function createHtml5Engine(video: HTMLVideoElement, ev: EngineEvents): Engine {
-  video.onwaiting = () => ev.onBuffering();
-  video.onplaying = () => ev.onPlaying();
-  video.ontimeupdate = () => ev.onTime(video.currentTime * 1000);
-  video.onended = () => ev.onEnd();
-  video.onerror = () => ev.onError(video.error ? `media error ${video.error.code}` : 'media error');
-  return {
-    async open(url, startMs) {
+/** Retângulo onde o vídeo aparece (a camada de vídeo do App segue este sinal). */
+const [rect, setRectSignal] = createSignal<Rect>(FULL);
+/** URL aberta agora ('' = nada tocando). */
+const [currentUrl, setCurrentUrl] = createSignal('');
+export { currentUrl, rect };
+
+let events: EngineEvents = noop;
+let opened = 0;
+let video: HTMLVideoElement | undefined;
+
+/** Chamado pela camada de vídeo do App (no Mac é um <video>; na TV, o <object> do AVPlay). */
+export function attachVideoElement(el: HTMLVideoElement | undefined) {
+  video = el;
+  if (!el) return;
+  el.onwaiting = () => events.onBuffering();
+  el.onplaying = () => events.onPlaying();
+  el.ontimeupdate = () => events.onTime(el.currentTime * 1000);
+  el.onended = () => events.onEnd();
+  el.onerror = () => events.onError(el.error ? `media error ${el.error.code}` : 'media error');
+}
+
+export const player = {
+  /** Troca quem recebe os eventos (player em tela cheia ↔ prévia da grade). */
+  setEvents(ev: EngineEvents | null) {
+    events = ev || noop;
+  },
+
+  setRect(r: Rect) {
+    setRectSignal(r);
+    const av = avplay();
+    if (av && currentUrl()) safe(() => av.setDisplayRect(r.x, r.y, r.w, r.h), undefined);
+  },
+
+  open(url: string, startMs = 0): Promise<void> {
+    const mine = ++opened;
+    setCurrentUrl(url);
+    const av = avplay();
+    if (!av) {
+      if (!video) return Promise.reject(new Error('sem player disponível'));
       video.src = import.meta.env.DEV ? '/__proxy?url=' + encodeURIComponent(url) : url;
       if (startMs) video.currentTime = startMs / 1000;
-      await video.play();
-    },
-    play: () => void video.play(),
-    pause: () => video.pause(),
-    stop() {
+      return video.play();
+    }
+    safe(() => av.stop(), undefined);
+    safe(() => av.close(), undefined);
+    return new Promise((resolve, reject) => {
+      try {
+        av.open(url);
+        const r = rect();
+        av.setDisplayRect(r.x, r.y, r.w, r.h);
+        av.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX');
+        av.setListener({
+          onbufferingstart: () => mine === opened && events.onBuffering(),
+          onbufferingprogress: () => undefined,
+          onbufferingcomplete: () => mine === opened && events.onPlaying(),
+          oncurrentplaytime: (ms: number) => mine === opened && events.onTime(ms),
+          onstreamcompleted: () => mine === opened && events.onEnd(),
+          onerror: (e: unknown) => mine === opened && events.onError(String(e)),
+          onevent: () => undefined,
+        });
+        av.prepareAsync(
+          () => {
+            if (mine !== opened) return resolve();
+            const start = () => {
+              safe(() => av.play(), undefined);
+              events.onPlaying();
+              resolve();
+            };
+            if (startMs > 0) av.seekTo(startMs, start, start);
+            else start();
+          },
+          (e) => reject(new Error(String(e))),
+        );
+      } catch (e) {
+        reject(e instanceof Error ? e : new Error(String(e)));
+      }
+    });
+  },
+
+  play() {
+    const av = avplay();
+    if (av) safe(() => av.play(), undefined);
+    else if (video) void video.play();
+  },
+
+  pause() {
+    const av = avplay();
+    if (av) safe(() => av.pause(), undefined);
+    else if (video) video.pause();
+  },
+
+  stop() {
+    opened++;
+    setCurrentUrl('');
+    const av = avplay();
+    if (av) {
+      safe(() => av.stop(), undefined);
+      safe(() => av.close(), undefined);
+    } else if (video) {
       video.pause();
       video.removeAttribute('src');
       video.load();
-    },
-    seek: (ms) => (video.currentTime = Math.max(0, ms / 1000)),
-    time: () => video.currentTime * 1000,
-    duration: () => (isFinite(video.duration) ? video.duration * 1000 : 0),
-    paused: () => video.paused,
-  };
+    }
+  },
+
+  /** Resolve quando o salto terminou (o vídeo ainda pode carregar depois disso). */
+  seek(ms: number): Promise<void> {
+    const target = Math.max(0, ms);
+    const av = avplay();
+    if (av) return new Promise((resolve) => safe(() => av.seekTo(target, () => resolve(), () => resolve()), resolve()));
+    if (!video) return Promise.resolve();
+    const v = video;
+    return new Promise((resolve) => {
+      v.onseeked = () => {
+        v.onseeked = null;
+        resolve();
+      };
+      v.currentTime = target / 1000;
+    });
+  },
+
+  time(): number {
+    const av = avplay();
+    if (av) return safe(() => av.getCurrentTime(), 0);
+    return video ? video.currentTime * 1000 : 0;
+  },
+
+  duration(): number {
+    const av = avplay();
+    if (av) return safe(() => av.getDuration(), 0);
+    return video && isFinite(video.duration) ? video.duration * 1000 : 0;
+  },
+};
+
+// ---------- prévia ao vivo (canal que continua na caixinha da grade) ----------
+
+export interface Preview {
+  channelId: string;
+  category: string;
 }
 
-export function createEngine(ev: EngineEvents, video?: HTMLVideoElement): Engine {
-  const av = avplay();
-  if (av) return createAVPlayEngine(av, ev);
-  if (!video) throw new Error('sem player disponível');
-  return createHtml5Engine(video, ev);
+const [preview, setPreviewSignal] = createSignal<Preview | null>(null);
+export { preview };
+
+/** O player em tela cheia sai para a grade e o canal segue tocando na caixinha. */
+export function startPreview(p: Preview) {
+  player.setEvents({ ...noop, onEnd: stopPreview, onError: stopPreview });
+  setPreviewSignal(p);
+}
+
+/** Sai da TV ao vivo / app em segundo plano: fecha o vídeo e libera a conexão. */
+export function stopPreview() {
+  if (!preview()) return;
+  setPreviewSignal(null);
+  player.stop();
+}
+
+/**
+ * Player abrindo um canal: a prévia deixa de existir. Retorna true se é o mesmo canal
+ * (volta para tela cheia sem reabrir o stream); senão o player só troca o stream.
+ */
+export function adoptPreview(channelId: string): boolean {
+  const p = preview();
+  setPreviewSignal(null);
+  return !!p && p.channelId === channelId && !!currentUrl();
 }
