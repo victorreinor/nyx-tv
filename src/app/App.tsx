@@ -5,6 +5,7 @@ import { Toast } from '../ui/overlays';
 import { focusSidebar, isSidebarActive, Sidebar } from './Sidebar';
 import { SleepWatcher } from './SleepWatcher';
 import { ReminderWatcher } from './ReminderWatcher';
+import { UpdateWatcher } from './UpdateWatcher';
 import { VideoLayer } from '../player/VideoLayer';
 import { player } from '../player/engine';
 import { clearFocus, dispatchKey, FocusZone, focusZone, type Zone } from './focus';
@@ -155,6 +156,7 @@ export function App() {
       </FocusZone>
       <SleepWatcher />
       <ReminderWatcher />
+      <UpdateWatcher />
       <Toast />
     </Show>
   );

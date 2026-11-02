@@ -6,6 +6,7 @@ import solid from 'vite-plugin-solid';
  * O runtime da TV (Tizen 6 / Chromium 76) abre o app via file://.
  * Lá, <script type="module"> e o atributo crossorigin quebram o carregamento,
  * então o bundle sai em IIFE e o HTML vira script clássico.
+ * O HTML chama o carregador (boot.js), que escolhe entre o app.js do pacote e uma versão baixada.
  */
 function classicScripts(): Plugin {
   return {
@@ -13,7 +14,9 @@ function classicScripts(): Plugin {
     apply: 'build',
     enforce: 'post',
     transformIndexHtml(html) {
-      return html.replace(/ type="module"/g, ' defer').replace(/ crossorigin/g, '');
+      const out = html.replace(/ type="module"/g, ' defer').replace(/ crossorigin/g, '').replace(/src="\.\/app\.js"/, 'src="./boot.js"');
+      if (!out.includes('src="./boot.js"')) throw new Error('index.html sem o app.js para trocar pelo boot.js');
+      return out;
     },
   };
 }

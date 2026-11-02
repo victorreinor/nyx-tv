@@ -41,6 +41,13 @@ Pronto: o Nyx abre na TV. Adicione a sua lista (Xtream Codes ou M3U) e já pode 
 
 ## Atualizar
 
+O Nyx se atualiza sozinho pela internet: baixa a versão nova em segundo plano e usa na próxima vez que abrir.
+Em *Configurações › Sobre* aparecem a versão, o estado da atualização e o botão **Procurar agora**.
+Se uma versão nova não abrir direito, o Nyx volta sozinho para a anterior.
+
+Use o instalador só em dois casos: se o seu Nyx é a versão 1.3 ou anterior (ainda não tinha atualização sozinho),
+ou se *Configurações › Sobre* disser que a versão nova precisa ser instalada pelo celular ou PC (acontece quando muda algo do pacote, como permissões).
+
 O Apps2Samsung mostra os apps instalados na TV e avisa quando sai versão nova do Nyx. Atualize por ele mesmo.
 Se você instalou pelo `.wgt` próprio, baixe o `nyx.wgt` de novo pelo mesmo link e instale do mesmo jeito.
 

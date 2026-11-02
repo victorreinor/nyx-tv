@@ -28,7 +28,8 @@ export function installRemoteLog() {
   console.error = (...a: unknown[]) => (orig.error(...a), send('error', a));
   window.addEventListener('error', (e) => send('error', [e.message, `${e.filename}:${e.lineno}`]));
   window.addEventListener('unhandledrejection', (e) => send('error', ['unhandledrejection', e.reason]));
-  send('log', ['boot', navigator.userAgent]);
+  const boot = window.NyxBoot;
+  send('log', ['boot', __APP_VERSION__, boot ? (boot.ota ? 'baixada' : 'pacote ' + boot.packaged) : 'sem carregador', navigator.userAgent]);
   // memória da TV a cada minuto: se só sobe enquanto navega, tem vazamento
   const perf = performance as Performance & { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } };
   if (perf.memory) {

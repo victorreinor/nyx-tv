@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && vite build -c vite.worker.config.ts",
+    "build": "vite build && vite build -c vite.worker.config.ts && vite build -c vite.boot.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "tv": "./scripts/tv.sh",

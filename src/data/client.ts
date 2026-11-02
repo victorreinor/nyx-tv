@@ -5,9 +5,10 @@ import type { WorkerEvent } from './types';
 
 type Result<K extends keyof Api> = Api[K] extends (...a: any[]) => infer R ? (R extends Promise<infer U> ? U : R) : never;
 
+// No build, o carregador (src/boot/loader.ts) diz de onde vem o worker: pacote ou versão baixada.
 const worker = import.meta.env.DEV
   ? new Worker('/src/data/worker.ts', { type: 'module' })
-  : new Worker('worker.js');
+  : new Worker(window.NyxBoot ? window.NyxBoot.workerUrl : 'worker.js');
 
 let seq = 0;
 const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();

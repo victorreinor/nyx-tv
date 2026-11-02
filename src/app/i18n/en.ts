@@ -167,6 +167,19 @@ export const en: Record<MessageKey, string> = {
 
   'about.version': 'Version {v}',
   'about.tagline': 'An IPTV player made for TV, at night.',
+  'about.viaInternet': 'updated over the internet',
+
+  'update.title': 'Updates',
+  'update.idle': 'Nyx looks for new versions on its own and uses them the next time it opens.',
+  'update.checking': 'Looking for updates…',
+  'update.current': 'You are on the latest version.',
+  'update.ready': 'Version {v} downloaded. It starts the next time Nyx opens.',
+  'update.reinstall': 'Version {v} must be installed from your phone or computer, like the first time.',
+  'update.error': 'Could not check right now. Nyx will try again later.',
+  'update.check': 'Check now',
+  'update.apply': 'Open the new version',
+  'update.applied': 'Nyx updated to version {v}',
+  'update.rolledBack': 'Version {v} did not open properly. Nyx went back to the previous one.',
 
   'sync.title': 'Preparing your playlist',
   'sync.categories': 'Reading categories',

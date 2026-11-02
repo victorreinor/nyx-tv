@@ -6,7 +6,8 @@
 #   ./scripts/tv.sh --report   logs/erros da TV chegam no Mac (rode `bun run report` antes)
 #   ./scripts/tv.sh --debug    abre com o Web Inspector e imprime a porta
 #
-# Variáveis: TV_IP (padrão 192.168.15.15), TIZEN_PROFILE (padrão nyx), MAC_IP (detectado).
+# Variáveis: TV_IP (padrão 192.168.15.15), TIZEN_PROFILE (padrão nyx), MAC_IP (detectado),
+#   UPDATE_URL (de onde a TV baixa atualizações; padrão GitHub Pages, "off" desliga; teste: tools/update-server.ts).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TIZEN="$HOME/tizen-studio/tools/ide/bin/tizen"
@@ -34,6 +35,7 @@ if [ "$SEED" = 1 ]; then
   export VITE_SEED_NAME="${XC_NAME:-Minha lista}" VITE_SEED_HOST="$XC_HOST" VITE_SEED_USER="$XC_USER" VITE_SEED_PASS="$XC_PASS" VITE_SEED_TMDB="${TMDB_KEY:-}"
 fi
 [ "$REPORT" = 1 ] && export VITE_REPORT_URL="http://$MAC_IP:8787/report?f=nyx"
+[ -n "${UPDATE_URL:-}" ] && export VITE_UPDATE_URL="$UPDATE_URL"
 
 bun run build >/dev/null
 bun scripts/check-compat.ts

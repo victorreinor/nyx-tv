@@ -1,18 +1,24 @@
-# Cada tag vX.Y.Z (bun run release + git push --follow-tags) vira um release no
-# GitHub com o nyx.wgt anexado. É de lá que os instaladores de celular e PC
-# (Apps2Samsung, TV Installer…) baixam o Nyx.
+# Cada tag vX.Y.Z (bun run release + git push --follow-tags):
+#   1. vira um release no GitHub com o nyx.wgt anexado. É de lá que os instaladores de
+#      celular e PC (Apps2Samsung, TV Installer…) baixam o Nyx;
+#   2. vai para o GitHub Pages (victorreinor.github.io/nyx-tv/update/), de onde as TVs que
+#      já têm o Nyx baixam a versão nova sozinhas (atualização sem cabo, ver src/boot/).
 name: release
 
 on:
   push:
     tags: ['v*']
 
-permissions:
-  contents: write
+# um deploy do Pages por vez, sem cancelar o que já começou
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   wgt:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
@@ -37,3 +43,20 @@ jobs:
           else
             gh release create "$TAG" .build/release/nyx.wgt --title "Nyx $VERSION" --notes-file notes.md --verify-tag
           fi
+      # mesmo build do nyx.wgt (scripts/pages.ts): manifest.json + app.js + worker.js
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: .build/pages
+
+  pages:
+    needs: wgt
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}update/manifest.json
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

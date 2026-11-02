@@ -7,7 +7,7 @@ import { join } from 'node:path';
 const dist = join(import.meta.dir, '..', 'dist');
 let failed = false;
 
-for (const file of ['app.js', 'worker.js']) {
+for (const file of ['boot.js', 'app.js', 'worker.js']) {
   const code = readFileSync(join(dist, file), 'utf8');
   try {
     parse(code, { ecmaVersion: 2019, sourceType: 'script' });

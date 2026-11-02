@@ -50,7 +50,11 @@ Ordem = valor para quem assiste ÷ esforço. Cada entrega vira uma versão (SemV
 
 ## 2.0 — distribuição e manutenção
 
-- [ ] **Atualização sem cabo**: o GitHub Actions publica cada versão no GitHub Pages (`victorreinor.github.io/nyx-tv`, gratuito). A TV baixa a versão nova em segundo plano e usa na próxima abertura, com verificação por hash e volta automática se a nova travar.
+- [x] **Atualização sem cabo**: o GitHub Actions publica cada versão no GitHub Pages (`victorreinor.github.io/nyx-tv/update/`). A TV baixa a versão nova em segundo plano e usa na próxima abertura, com verificação por hash e volta automática se a nova travar.
+  - O carregador (`src/boot/`) vem no `.wgt` e nunca muda. Ele guarda até duas versões (a confirmada e a nova) no `localStorage`.
+  - A versão nova tem uma chance: se não confirmar que abriu em 30 s (ou quebrar ao carregar), volta para a anterior e nunca mais é baixada.
+  - Mudou a "casca" (carregador, `index.html`, `config.xml`, fontes)? O hash muda e a TV pede para reinstalar pelo celular/PC, em vez de rodar algo incompatível.
+  - Testado na UN50AU7700: download, troca na abertura seguinte e volta automática de uma versão quebrada.
 - [x] **`.wgt` em cada release**: a tag vira release no GitHub com o `nyx.wgt`, que os instaladores de celular/PC baixam. Vai sem assinatura: o instalador assina para a TV de quem instala.
 - [ ] **CI**: testes, tipos e checagem do Chrome 76 a cada envio (hoje só rodam na tag).
 - [ ] **Backup do usuário**: exportar/importar favoritos e progresso (QR code ou arquivo).

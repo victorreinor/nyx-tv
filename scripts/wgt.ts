@@ -1,13 +1,14 @@
 // Monta o .wgt que vai para o release do GitHub. É de lá que os instaladores de
 // celular/PC (Apps2Samsung, TV Installer…) baixam o Nyx.
 //
-//   bun run wgt   → .build/release/nyx.wgt
+//   bun run wgt   → .build/release/nyx.wgt  +  .build/pages (atualização sem cabo, ver scripts/pages.ts)
 //
 // Sai SEM assinatura, de propósito: o instalador assina de novo com o certificado da
 // TV de quem instala. O .wgt do ./scripts/tv.sh leva o seu certificado e só serve na sua TV.
 import { $ } from 'bun';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { buildPages } from './pages';
 
 const root = join(import.meta.dir, '..');
 const out = join(root, '.build', 'release');
@@ -41,3 +42,7 @@ await $`zip -qrX ${wgt} . -x '.*' '*/.*'`.cwd(stage);
 const bytes = readFileSync(wgt);
 const sha = new Bun.CryptoHasher('sha256').update(bytes).digest('hex');
 console.log(`ok  nyx.wgt ${version} (${(bytes.length / 1024).toFixed(0)} KB, sem assinatura)\n    sha256 ${sha}\n    ${wgt}`);
+
+// mesmos arquivos, para a atualização sem cabo (GitHub Pages)
+const pages = buildPages();
+console.log(`ok  atualização ${pages.version} (casca ${pages.shell})\n    ${pages.out}`);

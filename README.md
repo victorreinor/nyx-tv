@@ -46,6 +46,7 @@ searches 40 thousand titles while you type.
 | 🌐 **3 languages** | Português (Brasil), English, Español. |
 | 🔒 **Parental PIN** | Adult categories hidden by default (PIN `0000`, changeable). |
 | 🎨 **Own design system** | Night palette, Manrope, focus ring + scale, zero blur and zero heavy shadows. |
+| 🔄 **Updates itself** | After the first install, new versions arrive over the internet and start the next time Nyx opens. Every file is hash-checked, and a version that fails to open is rolled back on its own. |
 
 ## 📸 Screenshots
 
@@ -65,7 +66,7 @@ searches 40 thousand titles while you type.
 ## 📲 Install on your TV
 
 Nyx is not in the Samsung store. You install it **once** with [Apps2Samsung](https://github.com/Apps2Samsung/Apps2Samsung),
-a free community app for Android or computer that sends Nyx to the TV over Wi‑Fi. No Tizen Studio.
+a free community app for Android or computer that sends Nyx to the TV over Wi‑Fi. No Tizen Studio. After that, Nyx updates itself.
 
 1. Install **Apps2Samsung** on your phone or computer.
 2. On the TV: *Apps* → type `12345` → *Developer mode* on → *Host PC IP* = the phone’s/computer’s IP → restart the TV.
@@ -108,6 +109,7 @@ flowchart LR
 - **The UI never holds the full catalog.** The worker owns the data and answers with pages of ~30–70 items (keyset cursors).
 - **No backend.** Everything runs on the TV. Video goes straight from the provider to the hardware decoder.
 - **Navigation without layout reads.** The remote-control focus engine moves by index through a tree of zones and lists, so it never forces a reflow.
+- **Updates without a cable.** The `.wgt` carries a tiny loader (`src/boot/`) that never changes. Each release is also published to GitHub Pages; the app downloads it in the background, checks SHA-256 and size, and the loader runs it on the next start. If the new version does not confirm it opened, the loader goes back to the previous one.
 
 ## 🚀 Getting started
 
@@ -192,6 +194,7 @@ tools/        demo server, TV diagnostic, log receiver
 [SemVer](https://semver.org): fix → `1.0.1`, feature → `1.1.0`, breaking → `2.0.0`.
 The version lives only in `package.json` and is injected into the app and the TV package. See [CHANGELOG](CHANGELOG.md) and [ROADMAP](ROADMAP.md).
 Every tag pushed to GitHub becomes a [release](https://github.com/victorreinor/nyx-tv/releases) with `nyx.wgt` attached (`.github/workflows/release.yml`), which is what the installers download.
+The same build goes to GitHub Pages (`victorreinor.github.io/nyx-tv/update/`), where TVs that already have Nyx pick it up by themselves.
 
 ## 🤝 Contributing
 
@@ -238,11 +241,12 @@ junta as versões SD/HD/FHD/4K do mesmo canal, lembra exatamente onde você paro
 | 🌐 **3 idiomas** | Português (Brasil), English, Español. |
 | 🔒 **PIN para adultos** | Categorias adultas escondidas por padrão (PIN `0000`, dá para trocar). |
 | 🎨 **Design system próprio** | Paleta noturna, Manrope, foco com anel e escala, zero desfoque e zero sombra pesada. |
+| 🔄 **Atualiza sozinho** | Depois da primeira instalação, as versões novas chegam pela internet e entram na próxima vez que o Nyx abrir. Cada arquivo é conferido por hash, e uma versão que não abre volta sozinha para a anterior. |
 
 ## 📲 Instalar na sua TV
 
 O Nyx não está na loja da Samsung. Você instala **uma vez** com o [Apps2Samsung](https://github.com/Apps2Samsung/Apps2Samsung),
-um app gratuito da comunidade, para Android ou computador, que manda o Nyx para a TV pelo Wi‑Fi. Sem Tizen Studio.
+um app gratuito da comunidade, para Android ou computador, que manda o Nyx para a TV pelo Wi‑Fi. Sem Tizen Studio. Depois disso, o Nyx se atualiza sozinho.
 
 1. Instale o **Apps2Samsung** no celular ou no computador.
 2. Na TV: *Apps* → digite `12345` → ligue o *Modo desenvolvedor* → *IP do PC host* = IP do celular/computador → reinicie a TV.
@@ -269,6 +273,7 @@ O app de diagnóstico que gerou os números está em [`tools/diag`](tools/diag).
 - **A interface nunca segura o catálogo inteiro.** O worker é dono dos dados e responde com páginas de ~30–70 itens (cursor keyset).
 - **Sem backend.** Tudo roda na TV. O vídeo vai direto do provedor para o decodificador da TV.
 - **Navegação sem medir a tela.** O motor de foco do controle anda por índice numa árvore de zonas e listas, sem forçar recálculo de layout.
+- **Atualização sem cabo.** O `.wgt` leva um carregador pequeno (`src/boot/`) que nunca muda. Cada versão também é publicada no GitHub Pages; o app baixa em segundo plano, confere SHA-256 e tamanho, e o carregador usa na próxima abertura. Se a versão nova não confirmar que abriu, ele volta para a anterior.
 
 O diagrama está na [seção em inglês](#-how-it-works).
 
@@ -333,6 +338,7 @@ TMDB_KEY=sua_chave_v3_do_tmdb   # opcional
 [SemVer](https://semver.org/lang/pt-BR/): correção → `1.0.1`, funcionalidade → `1.1.0`, mudança grande → `2.0.0`.
 A versão fica só no `package.json` e vai para o app e para o pacote da TV. Para lançar uma: `bun run release patch|minor|major` e `git push --follow-tags`.
 Cada tag enviada vira um [release](https://github.com/victorreinor/nyx-tv/releases) com o `nyx.wgt` anexado (`.github/workflows/release.yml`), que é o que os instaladores baixam.
+O mesmo build vai para o GitHub Pages (`victorreinor.github.io/nyx-tv/update/`), de onde as TVs que já têm o Nyx baixam sozinhas.
 Veja o [CHANGELOG](CHANGELOG.md) e o [ROADMAP](ROADMAP.md).
 
 ## 🤝 Contribuindo

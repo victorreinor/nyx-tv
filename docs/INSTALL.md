@@ -41,6 +41,13 @@ Done: Nyx opens on the TV. Add your playlist (Xtream Codes or M3U) and start wat
 
 ## Updating
 
+Nyx updates itself over the internet: it downloads the new version in the background and uses it the next time it opens.
+*Settings › About* shows the version, the update status and a **Check now** button.
+If a new version fails to open, Nyx goes back to the previous one on its own.
+
+You only need the installer in two cases: your Nyx is version 1.3 or older (before self-updating existed),
+or *Settings › About* says the new version must be installed from your phone or computer (this happens when something in the package changes, such as permissions).
+
 Apps2Samsung lists the apps installed on the TV and shows when a new Nyx version is out. Update from there.
 If you installed from a custom `.wgt`, download `nyx.wgt` again from the same link and install it the same way.
 

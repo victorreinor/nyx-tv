@@ -166,6 +166,19 @@ export const ptBR = {
 
   'about.version': 'Versão {v}',
   'about.tagline': 'Player de IPTV feito para TV, de noite.',
+  'about.viaInternet': 'atualizada pela internet',
+
+  'update.title': 'Atualizações',
+  'update.idle': 'O Nyx procura versões novas sozinho e usa na próxima vez que abrir.',
+  'update.checking': 'Procurando atualização…',
+  'update.current': 'Você está na versão mais nova.',
+  'update.ready': 'Versão {v} baixada. Ela entra na próxima vez que o Nyx abrir.',
+  'update.reinstall': 'A versão {v} precisa ser instalada pelo celular ou PC, como na primeira vez.',
+  'update.error': 'Não deu para procurar agora. O Nyx tenta de novo mais tarde.',
+  'update.check': 'Procurar agora',
+  'update.apply': 'Abrir a versão nova',
+  'update.applied': 'Nyx atualizado para a versão {v}',
+  'update.rolledBack': 'A versão {v} não abriu direito. O Nyx voltou para a anterior.',
 
   'sync.title': 'Preparando sua lista',
   'sync.categories': 'Lendo categorias',

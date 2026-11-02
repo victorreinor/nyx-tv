@@ -12,6 +12,7 @@ import { Logo } from '../ui/Icon';
 import { Badge, Toggle } from '../ui/primitives';
 import { PinDialog } from '../ui/overlays';
 import { VGrid } from '../ui/VGrid';
+import { applyUpdate, checkForUpdate, running, updateStatus } from '../app/update';
 
 type SectionId = 'playlists' | 'language' | 'parental' | 'player' | 'categories' | 'history' | 'tmdb' | 'storage' | 'about';
 const SECTIONS: { id: SectionId; icon: OptionItem['icon'] }[] = [
@@ -73,7 +74,13 @@ export function Settings() {
                 <Logo size={96} />
                 <span class="t-display">nyx</span>
                 <span class="t-body c-2">{t('about.tagline')}</span>
-                <span class="c-3">{t('about.version', { v: VERSION })} · github.com/victorreinor/nyx-tv</span>
+                <span class="c-3">
+                  {t('about.version', { v: VERSION })}
+                  {running.ota ? ' (' + t('about.viaInternet') + ')' : ''} · github.com/victorreinor/nyx-tv
+                </span>
+                <Show when={updateStatus().kind !== 'off'}>
+                  <UpdateBlock />
+                </Show>
               </div>
             </Panel>
           </Match>
@@ -319,6 +326,33 @@ function CategoriesPanel() {
         )}
       />
     </Panel>
+  );
+}
+
+function UpdateBlock() {
+  const text = () => {
+    const s = updateStatus();
+    switch (s.kind) {
+      case 'checking': return t('update.checking');
+      case 'current': return t('update.current');
+      case 'ready': return t('update.ready', { v: s.v });
+      case 'reinstall': return t('update.reinstall', { v: s.v });
+      case 'error': return t('update.error');
+      default: return t('update.idle');
+    }
+  };
+  const actions = (): Action[] => {
+    const s = updateStatus();
+    if (s.kind === 'ready') return [{ label: t('update.apply'), icon: 'refresh', onSelect: applyUpdate }];
+    if (s.kind === 'checking') return [];
+    return [{ label: t('update.check'), icon: 'refresh', onSelect: () => void checkForUpdate() }];
+  };
+  return (
+    <div class="stack g16 settings__update">
+      <h3 class="t-section">{t('update.title')}</h3>
+      <span class="t-body c-2">{text()}</span>
+      <ActionRow actions={actions} />
+    </div>
   );
 }
 

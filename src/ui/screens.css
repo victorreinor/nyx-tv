@@ -129,6 +129,7 @@
 .settings__nav { width: 420px; flex-shrink: 0; margin-right: 56px; grid-template-rows: auto auto 1fr; height: 100%; }
 .settings__title { margin-bottom: 24px; }
 .settings__version { align-self: end; }
+.settings__update { margin-top: 24px; justify-items: start; }
 .settings__panel { flex: 1 1 auto; min-width: 0; padding-top: 88px; height: 100%; overflow: hidden; }
 .playlist-card { padding: 28px; border-radius: var(--r-panel); background: var(--s1); border: 1px solid var(--line); }
 .playlist-card.is-active { background: var(--s2); border-color: var(--line); }
