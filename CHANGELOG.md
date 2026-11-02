@@ -4,6 +4,15 @@ Versões seguem [SemVer](https://semver.org/lang/pt-BR/): **correção** sobe o 
 **funcionalidade** sobe o do meio (1.1.0), **mudança grande** sobe o primeiro (2.0.0).
 Gerado por `bun run release patch|minor|major`.
 
+## [1.4.0] — 2026-11-02
+
+### Novidades
+- atualização sem cabo pelo GitHub Pages, com hash e volta automática
+- nyx.wgt em cada release do GitHub para instalar pelo celular
+
+### Outros
+- merge: nyx.wgt nos releases (outra sessão) + v1.3.0
+
 ## [1.3.0] — 2026-11-02
 
 ### Novidades
