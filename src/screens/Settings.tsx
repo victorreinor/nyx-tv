@@ -1,5 +1,5 @@
 // Configurações: seções à esquerda (o conteúdo acompanha o foco), painel à direita.
-import { createMemo, createResource, createSignal, For, type JSX, Match, Show, Switch } from 'solid-js';
+import { createMemo, createResource, createSignal, For, type JSX, Match, onCleanup, Show, Switch } from 'solid-js';
 import { call } from '../data/client';
 import type { Category, Kind, PlaylistConfig } from '../data/types';
 import { FocusZone, useList } from '../app/focus';
@@ -357,7 +357,20 @@ function UpdateBlock() {
 }
 
 function StoragePanel() {
-  const [mb] = createResource(dataVersion, () => call('storageMB'));
+  // o navegador libera o disco da versão anterior aos poucos: o número acompanha enquanto o painel está aberto
+  const [tick, setTick] = createSignal(0);
+  const timer = setInterval(() => setTick(tick() + 1), 5000);
+  onCleanup(() => clearInterval(timer));
+  let last = -1;
+  const [mb] = createResource(
+    () => [dataVersion(), tick()],
+    () =>
+      Promise.all([call('storageMB'), call('lastSaves')]).then(([n, saves]) => {
+        if (n !== last) console.log('[armazenamento]', n + ' MB', saves.join(' '));
+        last = n;
+        return n;
+      }),
+  );
   return (
     <Panel title={t('settings.storage')} hint={t('storage.reloadHint')}>
       <span class="t-section">{t('storage.used', { n: mb() || 0 })}</span>

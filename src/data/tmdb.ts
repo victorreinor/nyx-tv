@@ -2,10 +2,11 @@
 // ou falta de chave vira `null` e a tela segue com os dados do provedor.
 //
 // - limite de 4 s por consulta e no máximo 2 consultas ao mesmo tempo
-// - cache no IndexedDB: 30 dias para respostas, 1 dia para falhas (não insiste)
+// - cache no IndexedDB: 30 dias para respostas, 1 dia para falhas (não insiste). O vencido é
+//   apagado ao abrir o app (`pruneTmdb`), então o cache não cresce para sempre
 // - filmes: o provedor manda o tmdb_id (busca exata); séries: busca por nome + ano
 import { displayTitle, searchKey } from './normalize';
-import { loadRecord, saveRecord } from './store';
+import { loadRecord, pruneRecords, saveRecord } from './store';
 
 const API = 'https://api.themoviedb.org/3';
 const IMG = 'https://image.tmdb.org/t/p/';
@@ -95,7 +96,7 @@ async function cached<T>(key: string, load: () => Promise<T | null>): Promise<T 
   const full = `tmdb:${lang}:${key}`;
   if (memory.has(full)) return memory.get(full) as T | null;
   const saved = await loadRecord<{ at: number; data: T | null }>('snap', full).catch(() => undefined);
-  if (saved && Date.now() - saved.at < (saved.data ? TTL_OK : TTL_FAIL)) {
+  if (saved && !tmdbExpired(saved, Date.now())) {
     memory.set(full, saved.data);
     return saved.data;
   }
@@ -109,6 +110,16 @@ async function cached<T>(key: string, load: () => Promise<T | null>): Promise<T 
   if (memory.size > 200) memory.delete(memory.keys().next().value as string);
   saveRecord('snap', full, { at: Date.now(), data }).catch(() => undefined);
   return data;
+}
+
+/** Vencido = seria buscado de novo na próxima abertura. */
+export function tmdbExpired(saved: { at: number; data: unknown } | null | undefined, now: number): boolean {
+  return !saved || typeof saved.at !== 'number' || now - saved.at >= (saved.data ? TTL_OK : TTL_FAIL);
+}
+
+/** Apaga do IndexedDB o que venceu: o cache fica só com o que foi buscado nos últimos 30 dias. */
+export function pruneTmdb(now = Date.now()): Promise<number> {
+  return pruneRecords('snap', 'tmdb:', (v) => tmdbExpired(v as { at: number; data: unknown }, now)).catch(() => 0);
 }
 
 // ---------- conversão ----------

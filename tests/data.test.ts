@@ -4,6 +4,8 @@ import { parseM3u, xtreamFromM3uUrl } from '../src/data/m3u';
 import { channelGroupKey, cleanChannelName, detectQuality, isAdultCategory, searchKey, tmdbImage } from '../src/data/normalize';
 import { compareBy, keysetPage, type SortSpec } from '../src/data/paging';
 import { rankMatches } from '../src/data/search';
+import { fingerprint, hashText } from '../src/data/store';
+import { tmdbExpired } from '../src/data/tmdb';
 import { groupChannels, mapCategories } from '../src/data/xtream';
 
 describe('normalize', () => {
@@ -219,5 +221,39 @@ describe('selos de versão', () => {
     expect(versionTags('Acenda meu fogo(Dublado)')).toEqual(['DUB']);
     expect(displayTitle('Besouro Azul 4K')).toBe('Besouro Azul');
     expect(displayTitle('Acenda meu fogo(Dublado)')).toBe('Acenda meu fogo');
+  });
+});
+
+describe('cache do TMDB', () => {
+  const day = 86400 * 1000;
+  const now = 100 * day;
+  test('resposta vale 30 dias, falha vale 1 dia', () => {
+    expect(tmdbExpired({ at: now - 29 * day, data: { id: 1 } }, now)).toBe(false);
+    expect(tmdbExpired({ at: now - 30 * day, data: { id: 1 } }, now)).toBe(true);
+    expect(tmdbExpired({ at: now - day / 2, data: null }, now)).toBe(false);
+    expect(tmdbExpired({ at: now - day, data: null }, now)).toBe(true);
+  });
+  test('registro estranho conta como vencido (sai na limpeza)', () => {
+    expect(tmdbExpired(undefined, now)).toBe(true);
+    expect(tmdbExpired({ data: { id: 1 } } as unknown as { at: number; data: unknown }, now)).toBe(true);
+  });
+});
+
+describe('assinatura do snapshot', () => {
+  const rows = Array.from({ length: 9000 }, (_, i) => ({ id: i, name: 'Filme ' + i, added: 1700000000 + i }));
+  test('mesmo conteúdo = mesma assinatura (não regrava)', () => {
+    expect(fingerprint(rows)).toBe(fingerprint(rows.map((r) => ({ ...r }))));
+  });
+  test('qualquer mudança muda a assinatura', () => {
+    const changed = rows.map((r) => ({ ...r }));
+    changed[8500].name = 'Filme 8500 (Dublado)';
+    expect(fingerprint(changed)).not.toBe(fingerprint(rows));
+    expect(fingerprint(rows.slice(1))).not.toBe(fingerprint(rows));
+    expect(fingerprint([])).not.toBe(fingerprint([{}]));
+  });
+  test('texto do XMLTV', () => {
+    const xml = '<tv><programme start="20261103180000 -0300" channel="a"><title>Jornal</title></programme></tv>';
+    expect(hashText(xml)).toBe(hashText(xml.slice(0)));
+    expect(hashText(xml)).not.toBe(hashText(xml.replace('Jornal', 'Jornai')));
   });
 });

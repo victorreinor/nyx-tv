@@ -3,7 +3,7 @@
 import { Catalog } from './catalog';
 import { parseXmltv } from './epg';
 import { parseM3u } from './m3u';
-import { deletePlaylistData, estimateUsageMB, loadChunks, saveChunks } from './store';
+import { deletePlaylistData, estimateUsageMB, hashText, loadChunks, saveChunks } from './store';
 import type {
   Category,
   Channel,
@@ -24,7 +24,7 @@ import type {
   WorkerEvent,
 } from './types';
 import { UserStore } from './user';
-import { configureTmdb, tmdbEnabled, tmdbMovie, tmdbSeason, tmdbSeries } from './tmdb';
+import { configureTmdb, pruneTmdb, tmdbEnabled, tmdbMovie, tmdbSeason, tmdbSeries } from './tmdb';
 import type { TmdbView } from './types';
 import * as xc from './xtream';
 
@@ -50,6 +50,8 @@ function remember<K, V>(map: Map<K, V>, key: K, value: V) {
 
 // programas que já passaram saem da memória a cada hora
 setInterval(() => catalog.pruneEpg(), 3600 * 1000);
+// cache do TMDB vencido sai do IndexedDB; espera o boot terminar para não disputar o disco
+setTimeout(() => void pruneTmdb(), 30000);
 
 function emit(e: WorkerEvent) {
   ctx.postMessage({ event: e });
@@ -63,14 +65,29 @@ function current(): PlaylistConfig {
 interface Meta {
   catalogAt: number;
   epgAt: number;
+  /** Assinatura do XMLTV que gerou a grade salva. */
+  epgSrc?: string;
+}
+
+/** Assinatura do XMLTV da grade em memória: o mesmo arquivo de novo não é processado nem regravado. */
+let epgSrc = '';
+
+// o que a última sincronização regravou ou pulou (vai para o relatório pelo painel de Armazenamento)
+const saveLog: string[] = [];
+async function save(pid: string, name: string, rows: unknown[]) {
+  const t0 = Date.now();
+  const wrote = await saveChunks(pid, name, rows);
+  saveLog.push(`${name}=${wrote ? 'gravou' : 'pulou'}(${Date.now() - t0}ms)`);
+  if (saveLog.length > 14) saveLog.shift();
 }
 
 async function saveMeta(pid: string) {
-  const meta: Meta = { catalogAt: catalog.catalogAt, epgAt: catalog.epgAt };
-  await saveChunks(pid, 'meta', [meta]);
+  const meta: Meta = { catalogAt: catalog.catalogAt, epgAt: catalog.epgAt, epgSrc };
+  await save(pid, 'meta', [meta]);
 }
 
 async function loadSnapshot(pid: string): Promise<boolean> {
+  epgSrc = '';
   const [meta, channels, movies, series, categories] = await Promise.all([
     loadChunks<Meta>(pid, 'meta'),
     loadChunks<Channel>(pid, 'live'),
@@ -82,16 +99,19 @@ async function loadSnapshot(pid: string): Promise<boolean> {
   const episodes = await loadChunks<[number, Episode[]]>(pid, 'episodes');
   catalog.setCatalog({ channels, movies, series, categories, m3uEpisodes: episodes ? new Map(episodes) : null, at: meta[0].catalogAt });
   const epg = await loadChunks<[string, Program[]]>(pid, 'epg');
-  if (epg) catalog.setEpg(new Map(epg), meta[0].epgAt);
+  if (epg) {
+    catalog.setEpg(new Map(epg), meta[0].epgAt);
+    epgSrc = meta[0].epgSrc || '';
+  }
   return true;
 }
 
 async function saveCatalog(pid: string) {
-  await saveChunks(pid, 'live', catalog.channels);
-  await saveChunks(pid, 'movies', catalog.movies);
-  await saveChunks(pid, 'series', catalog.series);
-  await saveChunks(pid, 'categories', catalog.categories);
-  if (catalog.m3uEpisodes) await saveChunks(pid, 'episodes', Array.from(catalog.m3uEpisodes.entries()));
+  await save(pid, 'live', catalog.channels);
+  await save(pid, 'movies', catalog.movies);
+  await save(pid, 'series', catalog.series);
+  await save(pid, 'categories', catalog.categories);
+  if (catalog.m3uEpisodes) await save(pid, 'episodes', Array.from(catalog.m3uEpisodes.entries()));
   await saveMeta(pid);
 }
 
@@ -139,10 +159,18 @@ async function syncEpg(p: PlaylistConfig) {
   if (!url) return;
   emit({ type: 'progress', phase: 'epg', pct: 88 });
   const xml = await xc.fetchText(url, 180000);
-  const now = Date.now() / 1000;
-  const map = parseXmltv(xml, { from: now - 3 * 3600, to: now + 8 * 86400 });
-  catalog.setEpg(map, Date.now());
-  await saveChunks(p.id, 'epg', Array.from(map.entries()));
+  const src = hashText(xml);
+  if (src === epgSrc && catalog.epg.size > 0) {
+    // mesmo XMLTV de antes: a grade em memória já é essa. Regravar ~6 MB só enche o disco da TV
+    catalog.setEpg(catalog.epg, Date.now());
+    saveLog.push('epg=igual');
+  } else {
+    const now = Date.now() / 1000;
+    const map = parseXmltv(xml, { from: now - 3 * 3600, to: now + 8 * 86400 });
+    catalog.setEpg(map, Date.now());
+    await save(p.id, 'epg', Array.from(map.entries()));
+    epgSrc = src;
+  }
   await saveMeta(p.id);
   emit({ type: 'progress', phase: 'done', pct: 100 });
   emit({ type: 'updated', stats: catalog.stats() });
@@ -387,6 +415,10 @@ const api = {
 
   storageMB(): Promise<number> {
     return estimateUsageMB();
+  },
+
+  lastSaves(): string[] {
+    return saveLog.slice();
   },
 
   async removePlaylist(pid: string) {
