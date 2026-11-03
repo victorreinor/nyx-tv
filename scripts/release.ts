@@ -1,4 +1,4 @@
-// Nova versão: sobe o número, escreve o CHANGELOG com os commits desde a última tag,
+// Nova versão: sobe o número, escreve o CHANGELOG com os commits desde a última versão,
 // faz o commit "release: vX.Y.Z" e cria a tag. Depois: git push --follow-tags
 // (o GitHub Actions cria o release com o nyx.wgt, ver .github/workflows/release.yml)
 //
@@ -22,8 +22,10 @@ const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const [ma, mi, pa] = String(pkg.version).split('.').map(Number);
 const next = kind === 'major' ? `${ma + 1}.0.0` : kind === 'minor' ? `${ma}.${mi + 1}.0` : `${ma}.${mi}.${pa + 1}`;
 
-const lastTag = (await $`git describe --tags --abbrev=0`.nothrow().text()).trim();
-const range = lastTag ? `${lastTag}..HEAD` : 'HEAD';
+// desde o último commit "release: vX.Y.Z" do próprio histórico. Não usa `git describe`: tag criada
+// fora do main (ex.: em outra sessão antes do merge) não descreve o HEAD e o CHANGELOG puxava tudo
+const lastRelease = (await $`git log --grep=${'^release: v'} -n 1 --format=%H`.nothrow().text()).trim();
+const range = lastRelease ? `${lastRelease}..HEAD` : 'HEAD';
 const subjects = (await $`git log ${range} --pretty=%s`.text()).split('\n').filter((l) => l && !l.startsWith('release:'));
 const pick = (re: RegExp) => subjects.filter((s) => re.test(s)).map((s) => '- ' + s.replace(/^\w+(\([^)]*\))?:\s*/, ''));
 const feats = pick(/^feat/);
@@ -50,6 +52,6 @@ const readme = readFileSync('README.md', 'utf8').replace(/badge\/version-[0-9.]+
 writeFileSync('README.md', readme);
 
 await $`git add package.json CHANGELOG.md tizen/config.xml README.md`;
-await $`git commit -q -m ${`release: v${next}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`}`;
+await $`git commit -q -m ${`release: v${next}`}`;
 await $`git tag -a ${'v' + next} -m ${'Nyx ' + next}`;
 console.log(`v${next} pronta. Publique com: git push --follow-tags (o GitHub cria o release com o nyx.wgt)`);
