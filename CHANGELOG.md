@@ -4,6 +4,17 @@ Versões seguem [SemVer](https://semver.org/lang/pt-BR/): **correção** sobe o 
 **funcionalidade** sobe o do meio (1.1.0), **mudança grande** sobe o primeiro (2.0.0).
 Gerado por `bun run release patch|minor|major`.
 
+## [1.5.0] — 2026-11-07
+
+### Novidades
+- atalhos no ícone do Nyx (continuar assistindo, novos episódios e canais) — precisa reinstalar o .wgt
+
+### Correções
+- mini-grade do canal aberto por atalho, busca ou lembrete mostra o grupo do canal (favoritos só pelos favoritos)
+
+### Outros
+- chore: tv.sh reinicia o sdb quando ele trava e para com erro se a TV não conectar
+
 ## [1.4.3] — 2026-11-07
 
 ### Correções
