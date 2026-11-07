@@ -7,6 +7,7 @@ import { fmtClock, fmtTime, type MessageKey, t } from '../app/i18n';
 import { keyName, type KeyName } from '../app/keys';
 import { back, type Media, replace } from '../app/router';
 import { settings } from '../app/settings';
+import { saveProgress as storeProgress } from '../app/progress';
 import { setLastChannel, toast } from '../app/state';
 import { FULL, player, type Tracks } from '../player/engine';
 import { SLEEP_OPTIONS, setSleepTimer, sleepAt, sleepChoice } from '../player/sleep';
@@ -20,7 +21,7 @@ import { useClock } from '../ui/useClock';
 /** Qualidade que desceu sozinha nesta sessão do app (não é salva: amanhã tenta de novo a melhor). */
 const learned = new Map<string, Quality>();
 
-const SAVE_EVERY_MS = 10000;
+const SAVE_EVERY_MS = 5000;
 const OVERLAY_MS = 5000;
 const NEXT_EPISODE_S = 8;
 const SEEK_COMMIT_MS = 700;
@@ -97,6 +98,11 @@ export function Player(props: { media: Media }) {
   let zapTarget: string | null = null;
   let zapTimer: ReturnType<typeof setTimeout> | undefined;
   let zapChain: Promise<void> = Promise.resolve();
+  /**
+   * Saiu do player. Respostas do worker, timers e callbacks do AVPlay que chegam depois disso
+   * não podem abrir vídeo nem saltar: o vídeo tocaria escondido atrás da outra tela.
+   */
+  let disposed = false;
 
   let overlayTimer: ReturnType<typeof setTimeout> | undefined;
   let seekTimer: ReturnType<typeof setTimeout> | undefined;
@@ -112,6 +118,7 @@ export function Player(props: { media: Media }) {
   // ---------- ao vivo ----------
 
   async function openChannel(id: string) {
+    if (disposed) return;
     setChannelId(id);
     setLastChannel(id);
     showOverlay();
@@ -123,7 +130,7 @@ export function Player(props: { media: Media }) {
       call('channelQuality', id),
       call('channelRow', id, now - 60, now + 4 * 3600),
     ]);
-    if (channelId() !== id) return;
+    if (disposed || channelId() !== id) return;
     setRow(r);
     setSources(src);
     setManual(saved);
@@ -132,6 +139,7 @@ export function Player(props: { media: Media }) {
   }
 
   function playSource(i: number) {
+    if (disposed) return;
     if (i < 0) {
       setStatus('error');
       return;
@@ -255,27 +263,30 @@ export function Player(props: { media: Media }) {
     const position = pos() / 1000;
     const duration = dur() / 1000;
     if (m.kind === 'movie') {
-      call('saveProgress', { key: 'm:' + m.id, kind: 'movie', id: m.id, position, duration, updatedAt: now, title: m.title, image: m.image });
+      storeProgress({ key: 'm:' + m.id, kind: 'movie', id: m.id, position, duration, updatedAt: now, title: m.title, image: m.image }, force);
       return;
     }
     const ep = episode();
     if (!ep) return;
     const nx = m.episodes[epIndex() + 1];
-    call('saveProgress', {
-      key: 'e:' + ep.id,
-      kind: 'episode',
-      id: ep.id,
-      seriesId: m.seriesId,
-      season: ep.season,
-      episode: ep.episode,
-      ext: ep.ext,
-      position,
-      duration,
-      updatedAt: now,
-      title: m.seriesTitle,
-      image: m.image,
-      next: nx ? { id: nx.id, season: nx.season, episode: nx.episode, ext: nx.ext, title: nx.title } : undefined,
-    });
+    storeProgress(
+      {
+        key: 'e:' + ep.id,
+        kind: 'episode',
+        id: ep.id,
+        seriesId: m.seriesId,
+        season: ep.season,
+        episode: ep.episode,
+        ext: ep.ext,
+        position,
+        duration,
+        updatedAt: now,
+        title: m.seriesTitle,
+        image: m.image,
+        next: nx ? { id: nx.id, season: nx.season, episode: nx.episode, ext: nx.ext, title: nx.title } : undefined,
+      },
+      force,
+    );
   }
 
   async function openVod(startSec: number) {
@@ -291,6 +302,7 @@ export function Player(props: { media: Media }) {
       if (!ep) return setStatus('error');
       src = await call('sources', 'episode', ep.id, settings.streamFormat, ep.ext, ep.url || '');
     }
+    if (disposed) return;
     if (!src[0]) return setStatus('error');
     vodOpenedAt = Date.now();
     lastAdvanceAt = Date.now();
@@ -302,6 +314,7 @@ export function Player(props: { media: Media }) {
 
   /** Primeira falha costuma ser o servidor "acordando": tenta de novo sozinho uma vez. */
   function retryVod() {
+    if (disposed) return;
     if (vodRetries < 1) {
       vodRetries++;
       openVod(pos() / 1000);
@@ -362,7 +375,9 @@ export function Player(props: { media: Media }) {
     setStatus('loading');
     requestAnimationFrame(() =>
       setTimeout(async () => {
+        if (disposed) return;
         await player.seek(target);
+        if (disposed) return;
         seeking = false;
         lastAdvanceAt = Date.now();
         if (paused()) {
@@ -540,6 +555,7 @@ export function Player(props: { media: Media }) {
 
   onCleanup(() => {
     saveProgress(true);
+    disposed = true;
     clearTimeout(overlayTimer);
     clearTimeout(seekTimer);
     clearInterval(nextTimer);
@@ -549,7 +565,8 @@ export function Player(props: { media: Media }) {
     clearTimeout(audioTimer);
     clearInterval(waitTimer);
     player.setEvents(null);
-    player.stop();
+    // a tela troca primeiro: fechar o AVPlay no meio de abrir/saltar pode segurar a TV
+    player.stop(true);
   });
 
   // ---------- visual ----------

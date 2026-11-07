@@ -179,13 +179,23 @@ export const player = {
     else if (video) video.pause();
   },
 
-  stop() {
-    opened++;
+  /**
+   * `defer`: deixa a tela trocar antes de fechar o AVPlay. stop/close no meio de abrir ou saltar
+   * podem segurar a TV por segundos; assim quem apertou Voltar já vê a tela anterior.
+   * Se outro vídeo abrir (ou alguém parar de novo) antes disso, o fechamento adiado não faz nada.
+   */
+  stop(defer = false) {
+    const mine = ++opened;
     setCurrentUrl('');
     const av = avplay();
     if (av) {
-      safe(() => av.stop(), undefined);
-      safe(() => av.close(), undefined);
+      const release = () => {
+        if (mine !== opened) return;
+        safe(() => av.stop(), undefined);
+        safe(() => av.close(), undefined);
+      };
+      if (defer) requestAnimationFrame(() => setTimeout(release, 30));
+      else release();
     } else if (video) {
       video.pause();
       video.removeAttribute('src');

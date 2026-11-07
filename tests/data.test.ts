@@ -6,6 +6,7 @@ import { compareBy, keysetPage, type SortSpec } from '../src/data/paging';
 import { rankMatches } from '../src/data/search';
 import { fingerprint, hashText } from '../src/data/store';
 import { tmdbExpired } from '../src/data/tmdb';
+import { isStarted, UserStore } from '../src/data/user';
 import { groupChannels, mapCategories } from '../src/data/xtream';
 
 describe('normalize', () => {
@@ -255,5 +256,24 @@ describe('assinatura do snapshot', () => {
     const xml = '<tv><programme start="20261103180000 -0300" channel="a"><title>Jornal</title></programme></tv>';
     expect(hashText(xml)).toBe(hashText(xml.slice(0)));
     expect(hashText(xml)).not.toBe(hashText(xml.replace('Jornal', 'Jornai')));
+  });
+});
+
+describe('progresso', () => {
+  test('30 s ou 3% já contam como começado', () => {
+    expect(isStarted({ position: 20, duration: 7200 })).toBe(false);
+    expect(isStarted({ position: 30, duration: 7200 })).toBe(true);
+    expect(isStarted({ position: 20, duration: 600 })).toBe(true);
+    expect(isStarted({ position: 10, duration: 0 })).toBe(false);
+  });
+
+  test('progresso velho (restaurado do localStorage) não apaga um mais novo', async () => {
+    const u = new UserStore();
+    const base = { key: 'e:1', kind: 'episode' as const, id: '1', duration: 2400, title: 'X', image: '' };
+    await u.saveProgress({ ...base, position: 900, updatedAt: 2000 }, true);
+    await u.saveProgress({ ...base, position: 100, updatedAt: 1000 }, true);
+    expect(u.getProgress('e:1')!.position).toBe(900);
+    await u.saveProgress({ ...base, position: 950, updatedAt: 3000 }, true);
+    expect(u.getProgress('e:1')!.position).toBe(950);
   });
 });

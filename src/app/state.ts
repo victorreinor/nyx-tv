@@ -2,6 +2,7 @@
 import { createSignal } from 'solid-js';
 import { call, onWorkerEvent } from '../data/client';
 import type { Stats, SyncPhase } from '../data/types';
+import { restoreProgress } from './progress';
 import { activePlaylist, filters } from './settings';
 
 export const [dataVersion, setDataVersion] = createSignal(0);
@@ -37,6 +38,7 @@ export async function openActive(): Promise<boolean> {
   const p = activePlaylist();
   if (!p) return false;
   const res = await call('open', p, filters(), import.meta.env.DEV);
+  await restoreProgress();
   setStats(res.stats);
   setDataVersion(dataVersion() + 1);
   return res.hasData;

@@ -345,8 +345,8 @@ const api = {
     return user.isFav(kind[0] + ':' + id);
   },
 
-  saveProgress(p: Progress) {
-    user.saveProgress(p);
+  saveProgress(p: Progress, now?: boolean): Promise<void> {
+    return user.saveProgress(p, !!now);
   },
 
   getProgress(key: string): Progress | null {

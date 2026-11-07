@@ -5,6 +5,7 @@ import type { CardItem, SortKey } from '../data/types';
 import { FocusZone, type ListHandle } from '../app/focus';
 import { type MessageKey, t } from '../app/i18n';
 import { openItem } from '../app/play';
+import { top } from '../app/router';
 import { usePaged } from '../app/paged';
 import { dataVersion, toast } from '../app/state';
 import { POSTER, PosterCard } from '../ui/cards';
@@ -30,9 +31,20 @@ export function Browse(props: { kind: 'movie' | 'series' }) {
     ...(cats() || []).map((c) => ({ id: c.id, label: c.name, count: c.count })),
   ]);
 
+  // "Continuar"/"Assistidos" mudam quando você assiste algo: recarrega ao voltar para a tela
+  const [returned, setReturned] = createSignal(0);
+  const route = props.kind === 'movie' ? 'movies' : 'series';
+  createEffect(
+    on(
+      () => top().name === route,
+      (visible) => visible && (category() === 'continue' || category() === 'watched') && setReturned(returned() + 1),
+      { defer: true },
+    ),
+  );
+
   const page = usePaged(
     (cursor) => call('page', props.kind, category(), sort(), cursor, 70),
-    () => [category(), sort(), dataVersion()],
+    () => [category(), sort(), dataVersion(), returned()],
   );
 
   // Ao abrir, o foco vai para os pôsteres (não para as categorias).

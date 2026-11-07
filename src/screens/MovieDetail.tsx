@@ -3,7 +3,7 @@
 import { createMemo, createResource, createSignal, Show } from 'solid-js';
 import { call } from '../data/client';
 import { displayTitle, tmdbImage } from '../data/normalize';
-import { STARTED, WATCHED } from '../data/user';
+import { isStarted, WATCHED } from '../data/user';
 import { active, FocusZone, type ListHandle } from '../app/focus';
 import { fmtDuration, t } from '../app/i18n';
 import { openItem, playMovie } from '../app/play';
@@ -42,7 +42,7 @@ export function MovieDetail(props: { id: string }) {
     const p = progress();
     return p && p.duration ? p.position / p.duration : 0;
   };
-  const resumable = () => pct() >= STARTED && pct() < WATCHED;
+  const resumable = () => !!progress() && isStarted(progress()!) && pct() < WATCHED;
   const trailer = () => (tm() && tm()!.trailer) || (info() && info()!.trailer) || '';
 
   const actions = (): Action[] => {

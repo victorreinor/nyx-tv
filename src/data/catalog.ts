@@ -21,7 +21,7 @@ import type {
   SortKey,
   Stats,
 } from './types';
-import { STARTED, WATCHED, type UserStore } from './user';
+import { isStarted, WATCHED, type UserStore } from './user';
 
 type Item = Channel | Movie | Series;
 
@@ -167,8 +167,7 @@ export class Catalog {
       if (!p || !p.duration) return false;
       const pct = p.position / p.duration;
       const done = pct >= WATCHED && !(kind === 'series' && p.next);
-      const started = pct >= STARTED || p.position >= 60;
-      const keep = category === 'watched' ? done : started && !done;
+      const keep = category === 'watched' ? done : isStarted(p) && !done;
       if (keep) when.set(it.id, p.updatedAt);
       return keep;
     });
@@ -276,7 +275,7 @@ export class Catalog {
         title: displayTitle(m.name),
         image: tmdbImage(m.poster, 'w342'),
         sub: m.year ? String(m.year) : '',
-        progress: progress >= STARTED && progress < WATCHED ? progress : undefined,
+        progress: p && isStarted(p) && progress < WATCHED ? progress : undefined,
         watched: progress >= WATCHED,
         versions: versionTags(m.name),
       };
@@ -295,7 +294,7 @@ export class Catalog {
       backdrop: tmdbImage(s.backdrop, 'w1280'),
       sub: [s.year || '', s.genre.split(',')[0]].filter(Boolean).join(' · '),
       tag: at ? `${at.s}|${at.e}` : undefined,
-      progress: p && !finished && pct >= STARTED ? pct : undefined,
+      progress: p && !finished && isStarted(p) ? pct : undefined,
       watched: !!p && finished && !p.next,
       newEpisode: baseline > 0 && s.added > baseline,
       versions: versionTags(s.name),
@@ -377,7 +376,7 @@ export class Catalog {
       const pct = p.duration ? p.position / p.duration : 0;
       if (p.kind === 'movie') {
         const m = this.movieById.get(Number(p.id));
-        if (!m || !this.visible(m) || pct < STARTED || pct >= WATCHED) continue;
+        if (!m || !this.visible(m) || !isStarted(p) || pct >= WATCHED) continue;
         out.push({ ...this.card('movie', m), sub: remaining(p), progress: pct, resume: { position: p.position } });
         continue;
       }
@@ -387,7 +386,7 @@ export class Catalog {
       if (!s || !this.visible(s)) continue;
       const base = this.card('series', s);
       if (pct < WATCHED) {
-        if (pct < STARTED && p.position < 60) continue;
+        if (!isStarted(p)) continue;
         out.push({ ...base, sub: `T${p.season} E${p.episode} · ${remaining(p)}`, progress: pct, resume: { episodeId: p.id, season: p.season, episode: p.episode, ext: p.ext, position: p.position } });
       } else if (p.next) {
         out.push({ ...base, sub: `T${p.next.season} E${p.next.episode}`, progress: 0, resume: { episodeId: p.next.id, season: p.next.season, episode: p.next.episode, ext: p.next.ext, position: 0 } });

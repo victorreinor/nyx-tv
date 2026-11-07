@@ -16,6 +16,12 @@ const empty = (): UserState => ({ favorites: {}, progress: {}, recentChannels: [
 /** Abaixo disso não conta como começado; acima disso conta como assistido. */
 export const STARTED = 0.03;
 export const WATCHED = 0.92;
+/** Ou começou por tempo: 30 s já entra no "continuar assistindo" (3% de um filme de 2 h seriam 3,6 min). */
+export const STARTED_S = 30;
+
+export function isStarted(p: { position: number; duration: number }): boolean {
+  return p.position >= STARTED_S || (!!p.duration && p.position / p.duration >= STARTED);
+}
 
 export class UserStore {
   state: UserState = empty();
@@ -37,10 +43,10 @@ export class UserStore {
     this.timer = setTimeout(() => this.flush(), 800);
   }
 
-  flush() {
+  flush(): Promise<void> {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
-    if (this.pid) saveRecord('user', this.pid, this.state).catch(() => undefined);
+    return this.pid ? saveRecord('user', this.pid, this.state).catch(() => undefined) : Promise.resolve();
   }
 
   isFav(key: string): boolean {
@@ -63,10 +69,15 @@ export class UserStore {
       .map((k) => k.slice(prefix.length));
   }
 
-  saveProgress(p: Progress) {
+  /** `now` grava na hora (saindo do player/do app). Nunca troca um progresso mais novo por um velho. */
+  saveProgress(p: Progress, now = false): Promise<void> {
+    const cur = this.state.progress[p.key];
+    if (cur && cur.updatedAt > p.updatedAt) return Promise.resolve();
     this.state.progress[p.key] = p;
     this.seriesIndex = null;
+    if (now) return this.flush();
     this.persist();
+    return Promise.resolve();
   }
 
   latestForSeries(seriesId: number): Progress | undefined {

@@ -4,6 +4,7 @@ import { call } from '../data/client';
 import type { Category, Kind, PlaylistConfig } from '../data/types';
 import { FocusZone, useList } from '../app/focus';
 import { fmtAgo, fmtDay, LOCALES, t } from '../app/i18n';
+import { dropPendingProgress } from '../app/progress';
 import { go, reset } from '../app/router';
 import { type QualityPref, removePlaylistSetting, setSetting, settings } from '../app/settings';
 import { applyFilters, dataVersion, openActive, runSync, setDataVersion, stats, toast } from '../app/state';
@@ -408,6 +409,7 @@ function HistoryPanel() {
       return;
     }
     setConfirm(null);
+    if (id !== 'channels') dropPendingProgress();
     call('clearHistory', id as 'movie' | 'episode' | 'channels' | 'all').then(() => {
       toast(t('history.cleared'));
       setDataVersion(dataVersion() + 1);

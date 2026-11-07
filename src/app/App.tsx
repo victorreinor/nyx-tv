@@ -27,6 +27,8 @@ import { Settings } from '../screens/Settings';
 import { PlaylistForm } from '../screens/PlaylistForm';
 import { SyncScreen, Welcome } from '../screens/Onboarding';
 
+const STALE_KEY_MS = 1500;
+
 function renderRoute(r: Route): JSX.Element {
   switch (r.name) {
     case 'home': return <Home />;
@@ -72,6 +74,9 @@ export function App() {
     const k = keyName(e);
     if (!k) return;
     e.preventDefault();
+    // TV ficou presa (AVPlay fechando, render pesado): as teclas apertadas nesse meio-tempo chegam
+    // todas juntas depois. Voltar repetido levaria ao "sair do app"; descarta o que ficou velho.
+    if (e.timeStamp > 0 && performance.now() - e.timeStamp > STALE_KEY_MS) return;
     const arrow = k === 'up' || k === 'down' || k === 'left' || k === 'right';
     if (arrow && e.repeat) {
       // segurar a seta não pode atropelar a renderização da TV

@@ -8,7 +8,7 @@ import { openYouTube } from '../app/youtube';
 import { top } from '../app/router';
 import { toast } from '../app/state';
 import { displayTitle, tmdbImage } from '../data/normalize';
-import { STARTED, WATCHED } from '../data/user';
+import { isStarted, WATCHED } from '../data/user';
 import { CastCard, EPISODE, POSTER, PosterCard, WideCard } from '../ui/cards';
 import { type Action, ActionRow, ChipRow } from '../ui/controls';
 import { Rail } from '../ui/Rail';
@@ -84,8 +84,8 @@ export function ShowDetail(props: { id: string }) {
         id: e.id,
         title: `E${e.episode} · ${title || t('detail.episode', { n: e.episode })}`,
         image: e.image || (extra && extra.still) || (info() ? tmdbImage(info()!.series.backdrop || info()!.series.poster, 'w780') : ''),
-        sub: watched ? t('detail.watched') : pct >= STARTED && p ? t('common.left', { t: fmtDuration(p.duration - p.position) }) : e.duration ? fmtDuration(e.duration) : '',
-        progress: pct >= STARTED ? pct : undefined,
+        sub: watched ? t('detail.watched') : p && isStarted(p) ? t('common.left', { t: fmtDuration(p.duration - p.position) }) : e.duration ? fmtDuration(e.duration) : '',
+        progress: p && isStarted(p) ? pct : undefined,
         resume: { position: watched ? 0 : p ? p.position : 0 },
       } as CardItem;
     }),
