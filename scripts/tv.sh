@@ -48,7 +48,17 @@ sed "s/ version=\"[0-9.]*\" viewmodes/ version=\"$VERSION\" viewmodes/" tizen/co
 echo "versão $VERSION"
 python3 -I scripts/make-icon.py "$OUT/icon.png" 512
 
-"$SDB" connect "$TV_IP" >/dev/null
+# o sdb do Mac às vezes trava e recusa a TV mesmo com a porta aberta: reinicia e tenta de novo
+connected() { "$SDB" devices | grep -q "^$TARGET"; }
+"$SDB" connect "$TV_IP" >/dev/null || true
+if ! connected; then
+  "$SDB" kill-server >/dev/null 2>&1 || true
+  "$SDB" connect "$TV_IP" >/dev/null || true
+fi
+if ! connected; then
+  echo "TV $TV_IP não conectou pelo sdb. Confira na TV: Apps › 12345 › Developer mode On, Host PC IP = $MAC_IP, e reinicie a TV." >&2
+  exit 1
+fi
 "$TIZEN" package -t wgt -s "$PROFILE" -- "$OUT" >/dev/null
 # o instalador da TV falha com espaço no nome do .wgt
 mv "$OUT"/*.wgt "$OUT/nyx.wgt"
