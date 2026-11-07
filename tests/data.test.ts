@@ -188,6 +188,41 @@ describe('mini-grade', () => {
     expect(g.index).toBe(1);
     expect(cat.neighborChannel(chans[1].id, 'fav', 1)).toBe(chans[0].id);
   });
+
+  test('atalho/busca (auto) usa o grupo do canal; favoritos só quando o canal é favorito', async () => {
+    const { Catalog } = await import('../src/data/catalog');
+    const { UserStore } = await import('../src/data/user');
+    const user = new UserStore();
+    const cat = new Catalog(user);
+    const chans = groupChannels(
+      [
+        { num: 1, name: 'Notícias HD', stream_id: 1, category_id: 1 },
+        { num: 2, name: 'Warner HD', stream_id: 2, category_id: 2 },
+        { num: 3, name: 'AMC HD', stream_id: 3, category_id: 2 },
+      ],
+      new Set(),
+    );
+    const cats = mapCategories(
+      [
+        { category_id: 1, category_name: 'Notícias' },
+        { category_id: 2, category_name: 'Filmes e Séries' },
+      ],
+      'live',
+    );
+    cat.setCatalog({ channels: chans, movies: [], series: [], categories: cats, at: 1 });
+    const warner = chans.find((c) => c.name.indexOf('Warner') === 0)!;
+    const films = warner.categories[0];
+
+    expect(cat.liveCategory('auto', warner.id)).toBe(films);
+    expect(cat.miniGuide('auto', warner.id, 0, 1).rows.map((r) => r.name)).toEqual(['Warner', 'AMC']);
+    // não favoritado: "fav" também cai no grupo dele
+    expect(cat.liveCategory('fav', warner.id)).toBe(films);
+    user.toggleFav('l:' + warner.id);
+    expect(cat.liveCategory('fav', warner.id)).toBe('fav');
+    expect(cat.miniGuide('fav', warner.id, 0, 1).rows.map((r) => r.name)).toEqual(['Warner']);
+    // categoria escolhida no Ao vivo continua valendo
+    expect(cat.liveCategory('all', warner.id)).toBe('all');
+  });
 });
 
 describe('novos episódios', () => {

@@ -3,13 +3,14 @@ import { call } from '../data/client';
 import type { CardItem, Episode, SeriesInfo } from '../data/types';
 import { go } from './router';
 
-export function openItem(item: CardItem, category = 'all') {
+/** `category` do canal: a do Ao vivo ou `fav`; sem ela (`auto`), a mini-grade usa o grupo do próprio canal. */
+export function openItem(item: CardItem, category = 'auto') {
   if (item.kind === 'live') return playChannel(item.id, category);
   if (item.kind === 'movie') return go({ name: 'movie', id: item.id });
   return go({ name: 'show', id: item.id });
 }
 
-export function playChannel(channelId: string, category = 'all') {
+export function playChannel(channelId: string, category = 'auto') {
   go({ name: 'player', media: { kind: 'live', channelId, category } });
 }
 

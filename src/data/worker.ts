@@ -271,6 +271,11 @@ const api = {
     return catalog.nowNext(id);
   },
 
+  /** Categoria que o player usa para a mini-grade e o CH▲▼ (`auto` = grupo do canal). */
+  liveCategory(category: string, channelId: string) {
+    return catalog.liveCategory(category, channelId);
+  },
+
   neighbor(id: string, category: string, step: number) {
     return catalog.neighborChannel(id, category, step);
   },

@@ -179,7 +179,7 @@ export function Player(props: { media: Media }) {
     if (m.kind !== 'live') return;
     showOverlay();
     zapChain = zapChain.then(async () => {
-      const id = await call('neighbor', zapTarget || channelId(), m.category, step);
+      const id = await call('neighbor', zapTarget || channelId(), liveCat, step);
       if (!id) return;
       zapTarget = id;
       const now = Date.now() / 1000;
@@ -214,9 +214,14 @@ export function Player(props: { media: Media }) {
 
   // ---------- mini-grade (OK/◀ no canal) ----------
 
+  // Categoria da mini-grade e do CH▲▼: resolvida uma vez ao abrir (`auto` = grupo do canal), para não
+  // trocar de grupo ao zapear por um canal que está em mais de uma categoria.
+  let liveCat = m.kind === 'live' ? m.category : 'all';
+  if (m.kind === 'live') call('liveCategory', m.category, m.channelId).then((c) => (liveCat = c));
+
   async function openGuide() {
     const now = Date.now() / 1000;
-    const g = await call('miniGuide', m.kind === 'live' ? m.category : 'all', channelId(), now - 60, now + 4 * 3600);
+    const g = await call('miniGuide', liveCat, channelId(), now - 60, now + 4 * 3600);
     setGuide(g);
   }
 

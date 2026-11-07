@@ -328,10 +328,20 @@ export class Catalog {
     return { items: (items as Channel[]).map((ch) => this.row(ch, from, to)), next, total: list.length };
   }
 
-  /** Lista de canais da categoria; se o canal não estiver nela (ou ela vier vazia), usa todos. */
+  /**
+   * Categoria da mini-grade e do CH▲▼. `auto` (atalho, busca, lembrete, recentes) = o grupo do próprio canal.
+   * Se o canal não estiver na categoria pedida (ex.: saiu dos favoritos), também cai no grupo dele; sem grupo, todos.
+   */
+  liveCategory(category: string, channelId: string): string {
+    const has = (cat: string) => (this.list('live', cat, 'num') as Channel[]).some((c) => c.id === channelId);
+    if (category !== 'auto' && has(category)) return category;
+    const ch = this.channelById.get(channelId);
+    const own = ch ? ch.categories.filter((cat) => !this.hidden.has(cat)).find(has) : undefined;
+    return own || 'all';
+  }
+
   private liveListWith(category: string, channelId: string): Channel[] {
-    const list = this.list('live', category, 'num') as Channel[];
-    return list.some((c) => c.id === channelId) ? list : (this.list('live', 'all', 'num') as Channel[]);
+    return this.list('live', this.liveCategory(category, channelId), 'num') as Channel[];
   }
 
   /** Mini-grade do player: canais da categoria só com agora/a seguir + posição do canal atual. */

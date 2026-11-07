@@ -27,7 +27,7 @@ export function ReminderWatcher() {
     const r = due();
     setDue(null);
     if (!r) return;
-    const media = { kind: 'live' as const, channelId: r.channelId, category: 'all' };
+    const media = { kind: 'live' as const, channelId: r.channelId, category: 'auto' };
     if (top().name === 'player') replace({ name: 'player', media });
     else go({ name: 'player', media });
   };
