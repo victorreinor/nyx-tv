@@ -53,6 +53,8 @@ Teclas no navegador: setas, Enter=OK, Esc/Backspace=Voltar, F1–F4=vermelha/ver
 | `src/app/focus.tsx` | **motor de foco** (ver abaixo) |
 | `src/app/App.tsx` | casca: pilha de telas (montadas e escondidas), teclas, Voltar, boot, segundo plano |
 | `src/boot/` | **carregador** (`boot.js`, vai no `.wgt`, nunca é atualizado) e `ota.ts` (qual versão abrir, puro e testado) |
+| `src/app/previewFeed.ts` / `preview.ts` / `PreviewWatcher.tsx` | fileiras no ícone do Nyx (Smart Hub Preview): JSON puro e testado · envio ao serviço e clique · quando atualizar |
+| `public/service/preview.js` | serviço do pacote que só repassa o JSON para a TV (casca: mudou = reinstalar) |
 | `src/app/update.ts` / `UpdateWatcher.tsx` | atualização sem cabo do lado do app: confirma a versão, baixa a próxima, avisos |
 | `scripts/pages.ts` / `shell.ts` | arquivos do GitHub Pages (`manifest.json` + `app.js` + `worker.js`) · hash da casca |
 | `src/app/router.ts` | `go`/`back`/`replace`/`goSection`. Seções = itens do menu lateral |
@@ -85,6 +87,10 @@ Teclas no navegador: setas, Enter=OK, Esc/Backspace=Voltar, F1–F4=vermelha/ver
 
 **Atualização sem cabo (`src/boot/`).** O `index.html` chama o `boot.js`, não o `app.js`. O carregador lê `nyx.ota` no `localStorage` e escolhe: versão nova (`next`, 1 chance), a confirmada (`cur`) ou o `app.js` do pacote. A versão baixada roda como script inline e o worker vem de `blob:` (`NyxBoot.workerUrl`; mesmo IndexedDB, testado na TV). O app chama `NyxBoot.started()` logo depois do `render` (se não chamar, volta na hora) e `ok()` 3 s depois de abrir (sem isso em 30 s, volta). O `UpdateWatcher` procura 1 min depois de abrir e a cada 6 h, confere tamanho e SHA-256 e entrega para `NyxBoot.stage`. A versão entra na próxima abertura ou ao voltar de 30 min em segundo plano. `manifest.shell` diferente da casca instalada = "reinstale pelo celular/PC" em Configurações › Sobre. Sem `NyxBoot` (`bun run dev`) tudo isso fica desligado.
 
+**Atalhos no ícone (Smart Hub Preview).** O app monta o JSON (`buildPreviewFeed`: continuar assistindo, novos episódios, canais favoritos/recentes) e chama o serviço `NyxTvApp01.preview` com app-control `pick`, dado `preview`. O serviço só chama `webapis.preview.setPreviewData` e fecha. Quando a TV o chama sozinha (a cada ~10 min), não vem JSON e ele fecha sem mexer. Atualiza 5 s depois de abrir, ao sair do player, com `dataVersion` e ao ir para segundo plano, e só se o JSON mudou (`nyx.preview` no `localStorage`). O clique chega como `eden_resume` com `PAYLOAD` = `{"values": action_data}`: na abertura (app fechado) ou pelo evento `appcontrol` (app em segundo plano, sem recarregar). `openPreviewAction` continua o vídeo, abre a série ou o canal.
+
+**Categoria do canal no player.** `media.category` = a do Ao vivo, `fav` ou `auto` (atalho, busca, lembrete, recentes). O worker resolve com `liveCategory` (`auto` ou canal fora da categoria = o grupo do próprio canal), e o player fixa o resultado ao abrir para a mini-grade e o CH▲▼ não trocarem de grupo ao zapear.
+
 **Lembretes e novos episódios.** Lembretes ficam em `settings.reminders` (main thread); `app/ReminderWatcher.tsx` avisa 1 min antes, em qualquer tela. "Novo ep.": `UserStore.seriesBaseline` (abriu/favoritou/assistiu) comparado com `series.added` (last_modified do provedor); abrir a série chama `markSeriesSeen`.
 
 **Qualidade automática.** O provedor entrega cada qualidade como stream separado. `pickStart` escolhe por onde começar (salvo do canal > preferência > melhor abaixo). O `StallMonitor` decide quando trocar (não abriu em 9 s, 3 travadas por minuto ou 7 s carregando), e `nextFallback` desce primeiro e só depois sobe. A qualidade que desceu sozinha fica só na sessão.
@@ -114,4 +120,5 @@ Teclas no navegador: setas, Enter=OK, Esc/Backspace=Voltar, F1–F4=vermelha/ver
 - Episódio grande pode levar mais de 9 s para abrir: VOD espera 25 s e tenta de novo 1× sozinho.
 - O Vite 8 embute o CSS no `app.js` (não existe `.css` separado no build). E escreve strings com crase (`` `1.3.0` ``), não aspas.
 - A versão baixada roda como script inline: `document.currentScript.src` é vazio, então URL relativa (fontes) resolve pelo `index.html`, que está no pacote. Por isso asset novo não chega pela atualização.
+- `tizen.systeminfo.getCapability('http://tizen.org/feature/web.service')` diz **falso** na UN50AU7700 e o serviço do preview funciona. Não use como bloqueio.
 - **Vídeo em janela pequena (prévia/PIP) não funciona na UN50AU7700 / Tizen 6.** O AVPlay fica em PLAYING, com o tempo andando e o retângulo certo, e mesmo assim a área fica preta. Já foram tentados: `setDisplayRect` tocando, reabrir com o retângulo antes do `prepare`, `<object>` encolhido ou em tela cheia, e página transparente com furo. Foi removido na 1.0.1. Não tente de novo sem um modelo diferente para testar.

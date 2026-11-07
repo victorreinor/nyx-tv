@@ -6,6 +6,7 @@ import { focusSidebar, isSidebarActive, Sidebar } from './Sidebar';
 import { SleepWatcher } from './SleepWatcher';
 import { ReminderWatcher } from './ReminderWatcher';
 import { UpdateWatcher } from './UpdateWatcher';
+import { PreviewWatcher } from './PreviewWatcher';
 import { VideoLayer } from '../player/VideoLayer';
 import { player } from '../player/engine';
 import { clearFocus, dispatchKey, FocusZone, focusZone, type Zone } from './focus';
@@ -162,6 +163,7 @@ export function App() {
       <SleepWatcher />
       <ReminderWatcher />
       <UpdateWatcher />
+      <PreviewWatcher />
       <Toast />
     </Show>
   );

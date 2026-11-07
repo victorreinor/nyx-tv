@@ -13,6 +13,18 @@
     <tizen:privilege name="http://tizen.org/privilege/unlimitedstorage"/>
     <tizen:privilege name="http://tizen.org/privilege/fullscreen"/>
     <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
+    <!-- Smart Hub Preview: fileiras no ícone do app. O clique num quadro abre (ou retoma, sem recarregar) o app com o action_data -->
+    <tizen:app-control>
+        <tizen:src name="index.html" reload="disable"/>
+        <tizen:operation name="http://samsung.com/appcontrol/operation/eden_resume"/>
+    </tizen:app-control>
+    <tizen:service id="NyxTvApp01.preview" auto-restart="false" on-boot="false">
+        <tizen:content src="service/preview.js"/>
+        <tizen:name>preview</tizen:name>
+        <tizen:description>Smart Hub Preview</tizen:description>
+        <tizen:category name="http://tizen.org/category/service"/>
+    </tizen:service>
+    <tizen:metadata key="http://samsung.com/tv/metadata/use.preview" value="bg_service"/>
     <tizen:profile name="tv-samsung"/>
     <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
 </widget>
