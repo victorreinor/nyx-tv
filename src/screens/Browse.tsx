@@ -7,7 +7,7 @@ import { type MessageKey, t } from '../app/i18n';
 import { openItem } from '../app/play';
 import { top } from '../app/router';
 import { usePaged } from '../app/paged';
-import { dataVersion, toast } from '../app/state';
+import { dataVersion, toast, toggleFav } from '../app/state';
 import { POSTER, PosterCard } from '../ui/cards';
 import { ChipRow, type ChipItem } from '../ui/controls';
 import { ColorKeys } from '../ui/primitives';
@@ -69,8 +69,7 @@ export function Browse(props: { kind: 'movie' | 'series' }) {
       return true;
     }
     if (k === 'blue' && item) {
-      call('toggleFav', props.kind, item.id).then((on) => {
-        toast(on ? t('toast.favAdded') : t('toast.favRemoved'));
+      toggleFav(props.kind, item.id).then(() => {
         if (category() === 'fav') page.reload();
       });
       return true;

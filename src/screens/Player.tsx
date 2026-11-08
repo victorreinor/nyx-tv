@@ -8,14 +8,16 @@ import { keyName, type KeyName } from '../app/keys';
 import { back, type Media, replace } from '../app/router';
 import { settings } from '../app/settings';
 import { saveProgress as storeProgress } from '../app/progress';
-import { setLastChannel, toast } from '../app/state';
+import { setLastChannel, toast, toggleFav } from '../app/state';
+import { checkHealth, healthLine } from '../app/health';
+import type { HealthReport } from '../data/types';
 import { FULL, player, type Tracks } from '../player/engine';
 import { SLEEP_OPTIONS, setSleepTimer, sleepAt, sleepChoice } from '../player/sleep';
 import { VGrid } from '../ui/VGrid';
 import { nextFallback, pickStart, StallMonitor } from '../player/quality';
 import { OptionList, type OptionItem } from '../ui/controls';
 import { Icon } from '../ui/Icon';
-import { Badge, Img, LiveBadge, ProgressBar, Spinner } from '../ui/primitives';
+import { Badge, ColorKeys, Img, LiveBadge, ProgressBar, Spinner } from '../ui/primitives';
 import { useClock } from '../ui/useClock';
 
 /** Qualidade que desceu sozinha nesta sessão do app (não é salva: amanhã tenta de novo a melhor). */
@@ -40,6 +42,10 @@ export function Player(props: { media: Media }) {
   const clock = useClock(30000);
 
   const [status, setStatus] = createSignal<'loading' | 'playing' | 'buffering' | 'error'>('loading');
+  /** Último erro do AVPlay (detalhe técnico na tela de erro). */
+  const [lastError, setLastError] = createSignal('');
+  /** Teste da lista feito quando o vídeo não abriu: diz se é o servidor ou só este canal. */
+  const [diag, setDiag] = createSignal<HealthReport | null>(null);
   const [overlay, setOverlay] = createSignal(true);
   const [panel, setPanel] = createSignal(false);
   const [pos, setPos] = createSignal(0);
@@ -68,6 +74,21 @@ export function Player(props: { media: Media }) {
       waitTimer = setInterval(() => setWaitSec(Math.floor((Date.now() - t0) / 1000)), 1000);
     }),
   );
+  // não abriu: testa a lista (login, sem gastar conexão) para dizer se é o servidor ou só este vídeo
+  createEffect(
+    on(status, (st) => {
+      if (st !== 'error') return;
+      setDiag(null);
+      checkHealth(false).then((r) => !disposed && status() === 'error' && setDiag(r));
+    }),
+  );
+  const diagText = () => {
+    const r = diag();
+    if (!r) return '';
+    // aviso de vencimento não explica o vídeo não abrir; telas cheias, sim
+    if (r.state === 'fail' || (r.main && r.main.reason === 'connections')) return healthLine(r);
+    return m.kind === 'live' ? t('player.listOk') : t('player.listOkVod');
+  };
   let subTimer: ReturnType<typeof setTimeout> | undefined;
   let audioChecked = false; // escolha automática do áudio: uma vez por stream aberto
   let audioTimer: ReturnType<typeof setTimeout> | undefined;
@@ -150,11 +171,14 @@ export function Player(props: { media: Media }) {
     monitor.reset();
     audioChecked = false;
     clearTimeout(audioTimer);
-    player.open(sources()[i].url).catch(() => fallback());
+    player.open(sources()[i].url).catch((e) => {
+      setLastError(String((e as Error).message || e));
+      fallback('open');
+    });
   }
 
   /** Qualidade atual não aguentou: tenta a próxima (desce primeiro). */
-  function fallback() {
+  function fallback(why: 'open' | 'stall') {
     if (m.kind !== 'live') {
       setStatus('error');
       return;
@@ -168,7 +192,8 @@ export function Player(props: { media: Media }) {
     const from = sources()[cur] ? sources()[cur].quality : '';
     const to = sources()[next].quality;
     if (from && to && from !== to) {
-      toast(t('player.downgraded', { from, to }), 4000);
+      // não abriu ≠ travou: "sinal instável" só quando chegou a tocar
+      toast(why === 'open' ? t('player.notOpened', { from, to }) : t('player.downgraded', { from, to }), 4000);
       learned.set(channelId(), to);
     }
     playSource(next);
@@ -329,7 +354,7 @@ export function Player(props: { media: Media }) {
   }
 
   function onEnded() {
-    if (m.kind === 'live') return fallback();
+    if (m.kind === 'live') return fallback('stall');
     setPos(dur());
     saveProgress(true);
     if (m.kind === 'episode' && m.episodes[epIndex() + 1]) {
@@ -429,6 +454,11 @@ export function Player(props: { media: Media }) {
       return true;
     }
     showOverlay();
+    if (status() === 'error' && k === 'green') {
+      saveProgress(true);
+      replace({ name: 'status' });
+      return true;
+    }
     if (status() === 'error' && k === 'enter') {
       if (m.kind === 'live') openChannel(channelId());
       else {
@@ -446,7 +476,7 @@ export function Player(props: { media: Media }) {
       if (k === 'enter' || k === 'left') openGuide();
       else if (k === 'chup' || k === 'up') zap(1);
       else if (k === 'chdown' || k === 'down') zap(-1);
-      else if (k === 'blue') call('toggleFav', 'live', channelId()).then((on) => toast(on ? t('toast.favAdded') : t('toast.favRemoved')));
+      else if (k === 'blue') void toggleFav('live', channelId());
       return true;
     }
     // carregando (abertura ou depois de um salto): só Voltar funciona, com aviso
@@ -528,7 +558,11 @@ export function Player(props: { media: Media }) {
         saveProgress();
       },
       onEnd: onEnded,
-      onError: () => (m.kind === 'live' ? fallback() : retryVod()),
+      onError: (msg) => {
+        setLastError(msg);
+        if (m.kind === 'live') fallback('open');
+        else retryVod();
+      },
     });
     const pop = pushKeyHandler(onKey);
     onCleanup(pop);
@@ -554,7 +588,7 @@ export function Player(props: { media: Media }) {
       }
       const v = monitor.verdict();
       if (!v) return;
-      if (m.kind === 'live' && (settings.autoQuality || v === 'startup')) fallback();
+      if (m.kind === 'live' && (settings.autoQuality || v === 'startup')) fallback(v === 'startup' ? 'open' : 'stall');
     }, 1000);
   });
 
@@ -651,10 +685,21 @@ export function Player(props: { media: Media }) {
         </div>
       </Show>
       <Show when={status() === 'error'}>
-        <div class="player__center stack g16" style={{ 'justify-items': 'center' }}>
-          <Icon name="alert" size={56} color="var(--warn)" />
-          <span class="t-section">{t('player.failed')}</span>
-          <span class="c-2">OK · {t('common.retry')}</span>
+        <div class="player__center">
+          <div class="player__error stack g16">
+            <Icon name="alert" size={56} color="var(--warn)" />
+            <span class="t-section">{m.kind === 'live' ? t('player.failed') : t('player.failedVod')}</span>
+            <Show when={diag()} fallback={<span class="c-2">{t('health.checking')}</span>}>
+              <span class="t-body player__diag">{diagText()}</span>
+            </Show>
+            <Show when={lastError()}>
+              <span class="t-caption c-3">{lastError()}</span>
+            </Show>
+            <div class="row g32">
+              <span class="c-2">OK · {t('common.retry')}</span>
+              <ColorKeys keys={[{ color: 'green', label: t('health.diagnose') }]} />
+            </div>
+          </div>
         </div>
       </Show>
 

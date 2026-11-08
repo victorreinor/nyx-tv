@@ -1,14 +1,17 @@
 // Estado global pequeno: versão dos dados (telas recarregam quando muda), sincronização e avisos.
 import { createSignal } from 'solid-js';
 import { call, onWorkerEvent } from '../data/client';
-import type { Stats, SyncPhase } from '../data/types';
+import type { Kind, Stats, SyncPhase } from '../data/types';
 import { restoreProgress } from './progress';
 import { activePlaylist, filters } from './settings';
+import { t } from './i18n';
 
 export const [dataVersion, setDataVersion] = createSignal(0);
 /** Último canal sintonizado no player (a grade volta para ele no Voltar). */
 export const [lastChannel, setLastChannel] = createSignal<string | null>(null);
 export const [stats, setStats] = createSignal<Stats | null>(null);
+/** Último favorito alterado: quem mostra a estrela troca na hora, sem recarregar. */
+export const [favChange, setFavChange] = createSignal<{ kind: Kind; id: string; on: boolean } | null>(null);
 export const [sync, setSync] = createSignal<{ running: boolean; phase: SyncPhase; pct: number; error: string }>({
   running: false,
   phase: 'categories',
@@ -55,6 +58,14 @@ export async function runSync(): Promise<void> {
     setSync({ running: false, phase: 'done', pct: 0, error: String((err as Error).message || err) });
     throw err;
   }
+}
+
+/** Favorita/desfavorita (qualquer tela), mostra o aviso e avisa quem mostra a estrela. */
+export async function toggleFav(kind: Kind, id: string): Promise<boolean> {
+  const on = await call('toggleFav', kind, id);
+  setFavChange({ kind, id, on });
+  toast(on ? t('toast.favAdded') : t('toast.favRemoved'));
+  return on;
 }
 
 export function applyFilters() {

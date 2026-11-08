@@ -8,7 +8,7 @@ import { active, FocusZone, type ListHandle } from '../app/focus';
 import { fmtDuration, t } from '../app/i18n';
 import { openItem, playMovie } from '../app/play';
 import { top } from '../app/router';
-import { toast } from '../app/state';
+import { toast, toggleFav } from '../app/state';
 import { openYouTube } from '../app/youtube';
 import { CastCard, POSTER, PosterCard } from '../ui/cards';
 import { type Action, ActionRow } from '../ui/controls';
@@ -61,10 +61,7 @@ export function MovieDetail(props: { id: string }) {
       label: fav() ? t('common.favorited') : t('common.favorite'),
       icon: 'favorites',
       onSelect: () =>
-        call('toggleFav', 'movie', props.id).then((on) => {
-          setFav(on);
-          toast(on ? t('toast.favAdded') : t('toast.favRemoved'));
-        }),
+        toggleFav('movie', props.id).then(setFav),
     });
     return list;
   };

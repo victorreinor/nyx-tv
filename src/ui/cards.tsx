@@ -9,9 +9,14 @@ export const WIDE = { w: 352, h: 198, gap: 24 };
 export const EPISODE = { w: 400, h: 225, gap: 24 };
 export const CHANNEL = { w: 352, h: 120, gap: 24 };
 
-/** Selo da capa: "T2 E5" onde parou na série, ou "Visto". */
+/** Selo da capa: episódio novo ("Novo: T3 E5"), "T2 E5" onde parou na série, ou "Visto". */
 function posterTag(item: CardItem): string {
-  if (item.newEpisode) return t('card.newEpisode');
+  const n = item.newEp;
+  if (n) {
+    if (!n.s) return t('card.newEpisode');
+    const label = t('card.newEpAt', { ep: t('common.seasonEp', { s: n.s, e: n.e }) });
+    return n.count > 1 ? `${label} +${n.count - 1}` : label;
+  }
   if (item.tag) {
     const [s, e] = item.tag.split('|');
     return t('common.seasonEp', { s, e });
@@ -21,7 +26,7 @@ function posterTag(item: CardItem): string {
 
 export function PosterCard(props: { item: () => CardItem; focused: () => boolean }) {
   return (
-    <div class="card card--poster" classList={{ 'is-focused': props.focused(), 'is-started': !!props.item().progress, 'is-watched': !!props.item().watched, 'is-new': !!props.item().newEpisode }}>
+    <div class="card card--poster" classList={{ 'is-focused': props.focused(), 'is-started': !!props.item().progress, 'is-watched': !!props.item().watched, 'is-new': !!props.item().newEp }}>
       <div class="card__frame">
         <Img class="card__img" src={props.item().image} alt={props.item().title} />
         <Show when={posterTag(props.item())}>

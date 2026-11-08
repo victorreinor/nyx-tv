@@ -2,6 +2,7 @@
 // Tudo em um registro por lista no IndexedDB, gravado com debounce.
 import { loadRecord, saveRecord } from './store';
 import type { Progress, Quality } from './types';
+import { episodeKey, type EpisodeRef, type NewEpisodes } from './newEpisodes';
 
 export interface UserState {
   favorites: Record<string, number>; // l:<canal> | m:<filme> | s:<série> → adicionado em
@@ -9,9 +10,13 @@ export interface UserState {
   recentChannels: string[];
   channelQuality: Record<string, Quality>; // escolha manual ou aprendida (troca automática)
   seenSeries: Record<string, number>; // série → quando você abriu ela por último (s)
+  /** Episódios que existiam quando você abriu a série (referência do "novo episódio"). */
+  seenEpisodes: Record<string, EpisodeRef>;
+  /** Conferência do "novo episódio" contra a lista de episódios do provedor, por `series.added`. */
+  newEpisodes: Record<string, NewEpisodes>;
 }
 
-const empty = (): UserState => ({ favorites: {}, progress: {}, recentChannels: [], channelQuality: {}, seenSeries: {} });
+const empty = (): UserState => ({ favorites: {}, progress: {}, recentChannels: [], channelQuality: {}, seenSeries: {}, seenEpisodes: {}, newEpisodes: {} });
 
 /** Abaixo disso não conta como começado; acima disso conta como assistido. */
 export const STARTED = 0.03;
@@ -21,6 +26,16 @@ export const STARTED_S = 30;
 
 export function isStarted(p: { position: number; duration: number }): boolean {
   return p.position >= STARTED_S || (!!p.duration && p.position / p.duration >= STARTED);
+}
+
+/**
+ * Qual progresso representa a série: o episódio começado mais recente. Um episódio aberto por
+ * poucos segundos não toma o lugar do que você estava assistindo (ou terminou).
+ * Única regra: capa, Início, abas e página da série usam esta.
+ */
+export function moreRelevant(p: Progress, cur: Progress | null | undefined): boolean {
+  if (!cur) return true;
+  return isStarted(p) !== isStarted(cur) ? isStarted(p) : p.updatedAt > cur.updatedAt;
 }
 
 export class UserStore {
@@ -87,8 +102,7 @@ export class UserStore {
       for (const k in all) {
         const p = all[k];
         if (!p.seriesId) continue;
-        const cur = map.get(p.seriesId);
-        if (!cur || p.updatedAt > cur.updatedAt) map.set(p.seriesId, p);
+        if (moreRelevant(p, map.get(p.seriesId))) map.set(p.seriesId, p);
       }
       this.seriesIndex = map;
     }
@@ -103,10 +117,41 @@ export class UserStore {
     this.persist();
   }
 
+  /** O progresso mudou por fora do player (ids reencontrados pelo título). */
+  progressChanged() {
+    this.seriesIndex = null;
+    this.persist();
+  }
+
+  /** Esquece a referência de "novo episódio" de séries que saíram do catálogo (o registro não cresce para sempre). */
+  pruneSeries(exists: (id: number) => boolean) {
+    for (const map of [this.state.seenEpisodes, this.state.newEpisodes]) for (const id of Object.keys(map)) if (!exists(Number(id))) delete map[id];
+    this.persist();
+  }
+
   /** Abriu a série: os episódios que existem agora deixam de ser "novos". */
   markSeriesSeen(seriesId: number) {
     this.state.seenSeries[String(seriesId)] = Date.now() / 1000;
     this.persist();
+  }
+
+  setSeenEpisodes(seriesId: number, ref: EpisodeRef) {
+    this.state.seenEpisodes[String(seriesId)] = ref;
+    this.persist();
+  }
+
+  setNewEpisodes(seriesId: number, v: NewEpisodes) {
+    this.state.newEpisodes[String(seriesId)] = v;
+    this.persist();
+  }
+
+  /** Último episódio que você conhece da série: o maior entre o que existia ao abrir e o que assistiu. */
+  knownEpisodes(seriesId: number): EpisodeRef | null {
+    const seen = this.state.seenEpisodes[String(seriesId)];
+    let top = seen ? seen.top : 0;
+    const all = this.state.progress;
+    for (const k in all) if (all[k].seriesId === seriesId) top = Math.max(top, episodeKey(all[k]));
+    return top ? { top, n: seen ? seen.n : 0 } : null;
   }
 
   /**

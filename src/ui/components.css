@@ -97,7 +97,7 @@
 .card__sub { margin-top: 2px; font-size: 18px; color: var(--t3); }
 .card__progress { position: absolute; left: 0; right: 0; bottom: 0; }
 .card__progress .progress { border-radius: 0; }
-.card__tag { position: absolute; top: 12px; left: 12px; padding: 5px 11px; border-radius: var(--r-badge); background: rgba(10, 10, 18, 0.8); font-size: 15px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.card__tag { position: absolute; top: 12px; left: 12px; max-width: calc(100% - 24px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 5px 11px; border-radius: var(--r-badge); background: rgba(10, 10, 18, 0.8); font-size: 15px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
 .card.is-focused { transform: scale(1.08); z-index: 2; }
 .card.is-focused .card__frame { border-color: var(--ring); }
 .card.is-focused .card__title { color: var(--t1); }

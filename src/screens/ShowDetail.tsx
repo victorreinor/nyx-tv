@@ -6,9 +6,9 @@ import { fmtDuration, t } from '../app/i18n';
 import { openItem, playEpisode } from '../app/play';
 import { openYouTube } from '../app/youtube';
 import { top } from '../app/router';
-import { toast } from '../app/state';
+import { toast, toggleFav } from '../app/state';
 import { displayTitle, tmdbImage } from '../data/normalize';
-import { isStarted, WATCHED } from '../data/user';
+import { isStarted, moreRelevant, WATCHED } from '../data/user';
 import { CastCard, EPISODE, POSTER, PosterCard, WideCard } from '../ui/cards';
 import { type Action, ActionRow, ChipRow } from '../ui/controls';
 import { Rail } from '../ui/Rail';
@@ -40,7 +40,8 @@ export function ShowDetail(props: { id: string }) {
   /** Onde continuar: último episódio mexido (ou o seguinte, se terminou). */
   const resume = createMemo(() => {
     const i = info();
-    const last = (progress() || [])[0];
+    // mesma regra da capa e da Início: episódio aberto por segundos não vira o "continuar"
+    const last = (progress() || []).reduce<Progress | null>((a, p) => (moreRelevant(p, a) ? p : a), null);
     if (!i || !last) return null;
     const pct = last.duration ? last.position / last.duration : 0;
     if (pct < WATCHED) return { episodeId: last.id, position: last.position, season: last.season || 1, episode: last.episode || 1, left: last.duration - last.position };
@@ -91,9 +92,9 @@ export function ShowDetail(props: { id: string }) {
     }),
   );
 
-  const play = (episodeId: string, position: number) => {
+  const play = (episodeId: string, position: number, at?: { season: number; episode: number }) => {
     const i = info();
-    if (i) playEpisode(i, episodeId, position);
+    if (i) playEpisode(i, episodeId, position, at);
   };
 
   const actions = (): Action[] => {
@@ -108,7 +109,7 @@ export function ShowDetail(props: { id: string }) {
         label: r.left > 60 ? t('detail.continueEp', { ep, t: fmtDuration(r.left) }) : t('detail.startEp', { ep }),
         icon: 'play',
         variant: 'primary',
-        onSelect: () => play(r.episodeId, r.position),
+        onSelect: () => play(r.episodeId, r.position, r),
       });
     } else if (first) {
       list.push({ label: t('detail.startEp', { ep: t('common.seasonEp', { s: first.season, e: first.episode }) }), icon: 'play', variant: 'primary', onSelect: () => play(first.id, 0) });
@@ -118,10 +119,7 @@ export function ShowDetail(props: { id: string }) {
       label: fav() ? t('common.favorited') : t('common.favorite'),
       icon: 'favorites',
       onSelect: () =>
-        call('toggleFav', 'series', props.id).then((on) => {
-          setFav(on);
-          toast(on ? t('toast.favAdded') : t('toast.favRemoved'));
-        }),
+        toggleFav('series', props.id).then(setFav),
     });
     return list;
   };

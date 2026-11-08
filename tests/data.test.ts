@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import { cleanPrograms, parseXmltv, parseXmltvDate, programsInRange } from '../src/data/epg';
 import { parseM3u, xtreamFromM3uUrl } from '../src/data/m3u';
-import { channelGroupKey, cleanChannelName, detectQuality, isAdultCategory, searchKey, tmdbImage } from '../src/data/normalize';
+import { channelGroupKey, cleanChannelName, detectQuality, isAdultCategory, isExplicitTitle, markAdultByContent, searchKey, tmdbImage } from '../src/data/normalize';
 import { compareBy, keysetPage, type SortSpec } from '../src/data/paging';
 import { rankMatches } from '../src/data/search';
 import { fingerprint, hashText } from '../src/data/store';
 import { tmdbExpired } from '../src/data/tmdb';
 import { isStarted, UserStore } from '../src/data/user';
-import { groupChannels, mapCategories } from '../src/data/xtream';
+import { groupChannels, mapCategories, mapMovies } from '../src/data/xtream';
 
 describe('normalize', () => {
   test('detecta qualidade pelo último marcador', () => {
@@ -40,6 +40,29 @@ describe('normalize', () => {
     expect(isAdultCategory('24HRS ⛔ Brasileirinhas Adultos')).toBe(true);
     expect(isAdultCategory('OnlyFans & Privacy')).toBe(true);
     expect(isAdultCategory('Animação & Infantil')).toBe(false);
+  });
+
+  test('título explícito sem pegar palavras comuns', () => {
+    expect(isExplicitTitle('Hardcore fucking the Engineer')).toBe(true);
+    expect(isExplicitTitle('Ninfeta safada')).toBe(true);
+    expect(isExplicitTitle('Moby Dick')).toBe(false);
+    expect(isExplicitTitle('Sex Education')).toBe(false);
+    expect(isExplicitTitle('Cumplicidade')).toBe(false);
+    expect(isExplicitTitle('Cocktail')).toBe(false);
+  });
+
+  test('categoria adulta pelo conteúdo, não por um título solto', () => {
+    const categories = [
+      { id: 'm:1', adult: false }, // "Gay": maioria explícita
+      { id: 'm:2', adult: false }, // "Ação": um "xXx Reativado" no meio de muitos
+    ];
+    const items = [
+      ...['Fuck anywhere', 'Hardcore fucking', 'Horny roommate', 'Making of'].map((name) => ({ name, categories: ['m:1'], adult: false })),
+      ...['xXx Reativado', 'Duro de Matar', 'Velozes', 'Missão Impossível', 'John Wick'].map((name) => ({ name, categories: ['m:2'], adult: false })),
+    ];
+    expect(markAdultByContent(items, categories)).toBe(1);
+    expect(categories.map((c) => c.adult)).toEqual([true, false]);
+    expect(items.filter((i) => i.adult).length).toBe(4); // inclusive o "Making of" da categoria adulta
   });
 
   test('capa do TMDB no tamanho do card', () => {
@@ -241,11 +264,90 @@ describe('novos episódios', () => {
     );
     cat.setCatalog({ channels: [], movies: [], series, categories: [], at: 1 });
     user.state.favorites['s:1'] = 1000 * 1000; // favoritou no instante 1000 s
-    expect(cat.card('series', series[0]).newEpisode).toBe(true);
-    expect(cat.card('series', series[1]).newEpisode).toBe(false);
+    // mudou no provedor depois disso: candidata, mas sem selo até conferir os episódios
+    expect(cat.newEpisodeCandidates(20).map((x) => x.id)).toEqual([1]);
+    expect(cat.card('series', series[0]).newEp).toBeUndefined();
+    // conferido: T2 E1 é novo (e mais um depois dele)
+    user.setNewEpisodes(1, { added: 2000, count: 2, s: 2, e: 1 });
+    expect(cat.newEpisodeCandidates(20)).toEqual([]);
+    expect(cat.card('series', series[0]).newEp).toEqual({ s: 2, e: 1, count: 2 });
+    expect(cat.card('series', series[1]).newEp).toBeUndefined();
     expect(cat.home().newEpisodes.map((c) => c.id)).toEqual(['1']);
     user.markSeriesSeen(1); // abriu a série agora
-    expect(cat.card('series', series[0]).newEpisode).toBe(false);
+    expect(cat.card('series', series[0]).newEp).toBeUndefined();
+  });
+
+  test('mudança que não foi episódio (capa, sinopse) não ganha selo', async () => {
+    const { Catalog } = await import('../src/data/catalog');
+    const { UserStore } = await import('../src/data/user');
+    const { mapSeries } = await import('../src/data/xtream');
+    const user = new UserStore();
+    const cat = new Catalog(user);
+    const series = mapSeries([{ series_id: 1, name: 'Capa nova', last_modified: 2000, category_id: 1 }], new Set());
+    cat.setCatalog({ channels: [], movies: [], series, categories: [], at: 1 });
+    user.state.favorites['s:1'] = 1000 * 1000;
+    user.setNewEpisodes(1, { added: 2000, count: 0, s: 0, e: 0 });
+    expect(cat.card('series', series[0]).newEp).toBeUndefined();
+    expect(cat.home().newEpisodes).toEqual([]);
+    // o provedor mudou de novo: confere outra vez
+    series[0].added = 3000;
+    expect(cat.newEpisodeCandidates(20).length).toBe(1);
+  });
+});
+
+describe('continuar assistindo e assistidos', () => {
+  const ep = (id: string, season: number, episode: number, position: number, updatedAt: number, next?: boolean) => ({
+    key: 'e:' + id, kind: 'episode' as const, id, seriesId: 1, season, episode, position, duration: 2400, updatedAt, title: 'Dark', image: '',
+    next: next ? { id: String(Number(id) + 1), season, episode: episode + 1, ext: 'mp4', title: '' } : undefined,
+  });
+  async function setup() {
+    const { Catalog } = await import('../src/data/catalog');
+    const { UserStore } = await import('../src/data/user');
+    const { mapSeries } = await import('../src/data/xtream');
+    const user = new UserStore();
+    const cat = new Catalog(user);
+    const series = mapSeries([{ series_id: 1, name: 'Dark', last_modified: 1, category_id: 1 }], new Set());
+    const movies = mapMovies([{ stream_id: 50, name: 'Duna', category_id: 2 }], new Set());
+    cat.setCatalog({ channels: [], movies, series, categories: [], at: 1 });
+    return { user, cat };
+  }
+
+  test('abrir o próximo episódio e sair em segundos não tira a série da lista', async () => {
+    const { user, cat } = await setup();
+    await user.saveProgress(ep('10', 1, 3, 1200, 1000), true); // na metade do E3
+    await user.saveProgress(ep('11', 1, 4, 5, 2000), true); // abriu o E4 e saiu em 5 s
+    expect(cat.home().continueItems.map((c) => c.sub!.split(' · ')[0])).toEqual(['T1 E3']);
+    expect(cat.page('series', 'continue', 'added', null, 20).items.map((c) => c.id)).toEqual(['1']);
+    expect(cat.card('series', cat.seriesById.get(1)!).tag).toBe('1|3');
+  });
+
+  test('terminou o episódio: continua no próximo, mesmo com o seguinte aberto por segundos', async () => {
+    const { user, cat } = await setup();
+    await user.saveProgress(ep('10', 1, 3, 2390, 1000, true), true);
+    await user.saveProgress(ep('11', 1, 4, 3, 2000), true);
+    const c = cat.home().continueItems[0];
+    expect(c.resume).toMatchObject({ episodeId: '11', season: 1, episode: 4, position: 0 });
+  });
+
+  test('sem duração (o player não informou) aparece nas abas também', async () => {
+    const { user, cat } = await setup();
+    await user.saveProgress({ key: 'm:50', kind: 'movie', id: '50', position: 600, duration: 0, updatedAt: 1000, title: 'Duna', image: '' }, true);
+    expect(cat.home().continueItems.map((c) => c.id)).toEqual(['50']);
+    expect(cat.page('movie', 'continue', 'added', null, 20).items.map((c) => c.id)).toEqual(['50']);
+    expect(cat.page('movie', 'watched', 'added', null, 20).items).toEqual([]);
+  });
+
+  test('provedor trocou os ids: o progresso acha o filme e a série pelo título', async () => {
+    const { user, cat } = await setup();
+    await user.saveProgress({ key: 'm:9', kind: 'movie', id: '9', position: 600, duration: 7200, updatedAt: 1000, title: 'Duna', image: '' }, true);
+    await user.saveProgress({ ...ep('10', 1, 3, 1200, 2000), seriesId: 77 }, true);
+    const { mapSeries } = await import('../src/data/xtream');
+    // nova sincronização com os ids de hoje
+    cat.setCatalog({ channels: [], movies: mapMovies([{ stream_id: 50, name: 'Duna', category_id: 2 }], new Set()), series: mapSeries([{ series_id: 1, name: 'Dark', last_modified: 1, category_id: 1 }], new Set()), categories: [], at: 2 });
+    cat.afterSync();
+    expect(user.getProgress('m:50')!.position).toBe(600);
+    expect(user.getProgress('m:9')).toBeUndefined();
+    expect(cat.home().continueItems.map((c) => c.id).sort()).toEqual(['1', '50']);
   });
 });
 

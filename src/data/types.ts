@@ -143,8 +143,8 @@ export interface CardItem {
   /** Selo na capa: episódio onde parou ("T2 E5"). */
   tag?: string;
   watched?: boolean;
-  /** Série que você acompanha ganhou episódio desde a última vez que você a abriu. */
-  newEpisode?: boolean;
+  /** Série que você acompanha ganhou episódio desde a última vez que você a abriu: qual (s = 0: sem saber qual) e quantos. */
+  newEp?: { s: number; e: number; count: number };
   /** Selos de versão tirados do nome: 4K, LEG, DUB. */
   versions?: string[];
 }
@@ -235,3 +235,44 @@ export type WorkerEvent =
   | { type: 'progress'; phase: SyncPhase; pct: number }
   | { type: 'updated'; stats: Stats }
   | { type: 'error'; message: string };
+
+// ---------- Saúde da lista (src/data/health.ts) ----------
+
+/** Etapas do teste: servidor (login), conta, API do catálogo e, no teste completo, um canal, um filme e a grade. */
+export type HealthStepId = 'server' | 'account' | 'api' | 'live' | 'movie' | 'epg';
+
+export type HealthReason =
+  | 'ok'
+  | 'timeout' // não respondeu no prazo
+  | 'network' // sem conexão, DNS, recusado
+  | 'http' // respondeu com erro HTTP
+  | 'notJson' // respondeu, mas uma página (HTML) em vez de dados
+  | 'badData' // dados que não fazem sentido (lista vazia, arquivo que não é M3U/XMLTV/vídeo)
+  | 'auth' // usuário ou senha incorretos
+  | 'expired'
+  | 'banned'
+  | 'disabled'
+  | 'inactive'
+  | 'expiring' // vence em poucos dias (aviso)
+  | 'connections' // todas as telas da conta em uso (aviso)
+  | 'skipped'; // não testado (etapa anterior falhou ou não se aplica)
+
+export interface HealthStep {
+  id: HealthStepId;
+  state: 'ok' | 'warn' | 'fail' | 'skip';
+  reason: HealthReason;
+  /** Detalhe técnico, sem tradução (ex.: "HTTP 404 · nginx", "16384 bytes"). */
+  detail: string;
+  ms: number;
+  /** Valores para o texto da tela (dias, data, conexões, status do provedor). */
+  vars?: Record<string, string | number>;
+}
+
+export interface HealthReport {
+  at: number;
+  full: boolean;
+  state: 'ok' | 'warn' | 'fail';
+  /** Etapa que explica o resultado: a primeira falha, senão o primeiro aviso. */
+  main: HealthStep | null;
+  steps: HealthStep[];
+}

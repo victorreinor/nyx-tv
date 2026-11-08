@@ -8,6 +8,7 @@ import { type MessageKey, t } from '../app/i18n';
 import { back, reset } from '../app/router';
 import { newId, setSetting, settings, upsertPlaylist } from '../app/settings';
 import { openActive } from '../app/state';
+import { healthLine } from '../app/health';
 import { ActionRow } from '../ui/controls';
 import { Spinner } from '../ui/primitives';
 
@@ -52,9 +53,10 @@ export function PlaylistForm(props: { id?: string }) {
       p = { ...p, host: v.host.replace(/\/+$/, ''), username: v.username, password: v.password };
     }
     setStatus({ busy: true, error: '' });
-    const res = await call('check', p, import.meta.env.DEV).catch((e) => ({ ok: false, message: String(e) }));
-    if (!res.ok) {
-      setStatus({ busy: false, error: t('playlist.invalid', { msg: res.message === 'auth' ? t('playlist.authFail') : res.message }) });
+    // mesmo teste do diagnóstico (login + catálogo; M3U: o começo do arquivo)
+    const r = await call('health', p, false, settings.streamFormat, import.meta.env.DEV).catch(() => null);
+    if (!r || r.state === 'fail') {
+      setStatus({ busy: false, error: r ? healthLine(r) : t('health.title.down') });
       return;
     }
     upsertPlaylist(p);

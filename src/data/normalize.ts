@@ -71,6 +71,50 @@ export function isAdultCategory(name: string): boolean {
   return ADULT.test(name);
 }
 
+// Títulos explícitos (pt/en). Só palavras que quase nunca aparecem em título comum:
+// "cum" e "cock" exatos (não "cumplicidade", "cocktail"); sem "dick" (Moby Dick) nem "sex" (Sex Education).
+const EXPLICIT = /\b(fuck\w*|porn\w*|xxx|blowjobs?|anal|cum|cumshot|pussy|cocks?|milfs?|hentai|gangbang|threesome|bareback|creampie|horny|boquete|safad[ao]s?|ninfetas?|transando|fodendo|gozad[ao]|gozou|buceta|roludo|putaria|rabuda|siririca)\b/i;
+
+export function isExplicitTitle(name: string): boolean {
+  return EXPLICIT.test(name);
+}
+
+/**
+ * Categoria adulta pelo conteúdo: o nome nem sempre diz ("Gay", "Diversidade & Estilos").
+ * Marca a categoria (e os itens dela) quando ao menos `minShare` dos títulos e `minHits` itens são explícitos.
+ * Retorna quantas categorias marcou.
+ */
+export function markAdultByContent<T extends { name: string; categories: string[]; adult: boolean }>(
+  items: T[],
+  categories: { id: string; adult: boolean }[],
+  minShare = 0.3,
+  minHits = 3,
+): number {
+  const stats = new Map<string, { n: number; hits: number }>();
+  for (const it of items) {
+    const hit = isExplicitTitle(it.name);
+    for (const c of it.categories) {
+      const st = stats.get(c) || { n: 0, hits: 0 };
+      st.n++;
+      if (hit) st.hits++;
+      stats.set(c, st);
+    }
+  }
+  const adult = new Set<string>();
+  stats.forEach((st, c) => {
+    if (st.hits >= minHits && st.hits / st.n >= minShare) adult.add(c);
+  });
+  if (!adult.size) return 0;
+  let marked = 0;
+  for (const c of categories) {
+    if (!adult.has(c.id) || c.adult) continue;
+    c.adult = true;
+    marked++;
+  }
+  for (const it of items) if (!it.adult && it.categories.some((c) => adult.has(c))) it.adult = true;
+  return marked;
+}
+
 /** Capas do TMDB vêm em w600; na TV usamos o tamanho exato do card. */
 export function tmdbImage(url: string, size: 'w185' | 'w342' | 'w780' | 'w1280'): string {
   if (!url) return '';

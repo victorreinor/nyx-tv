@@ -48,6 +48,7 @@ Teclas no navegador: setas, Enter=OK, Esc/Backspace=Voltar, F1–F4=vermelha/ver
 | `src/data/catalog.ts` | catálogo em memória: listas ordenadas (LRU), `page`, `guide`, `search`, `home`, capas com progresso |
 | `src/data/xtream.ts` / `m3u.ts` | clientes e conversão para o modelo. Canais SD/HD/FHD/4K são agrupados em `groupChannels` |
 | `src/data/epg.ts` | XMLTV por regex + limpeza de duplicatas/sobreposição, busca binária por janela |
+| `src/data/health.ts` / `app/health.ts` / `screens/Status.tsx` | saúde da lista: classificação pura e testada + rede no worker · estado, histórico e textos · tela de diagnóstico |
 | `src/data/normalize.ts` / `search.ts` / `paging.ts` | funções puras (busca ranqueada, keyset, qualidade, títulos) |
 | `src/data/store.ts` / `user.ts` | IndexedDB em blocos de 4000 · favoritos, progresso, histórico |
 | `src/app/focus.tsx` | **motor de foco** (ver abaixo) |
@@ -92,6 +93,8 @@ Teclas no navegador: setas, Enter=OK, Esc/Backspace=Voltar, F1–F4=vermelha/ver
 **Categoria do canal no player.** `media.category` = a do Ao vivo, `fav` ou `auto` (atalho, busca, lembrete, recentes). O worker resolve com `liveCategory` (`auto` ou canal fora da categoria = o grupo do próprio canal), e o player fixa o resultado ao abrir para a mini-grade e o CH▲▼ não trocarem de grupo ao zapear.
 
 **Lembretes e novos episódios.** Lembretes ficam em `settings.reminders` (main thread); `app/ReminderWatcher.tsx` avisa 1 min antes, em qualquer tela. "Novo ep.": `UserStore.seriesBaseline` (abriu/favoritou/assistiu) comparado com `series.added` (last_modified do provedor); abrir a série chama `markSeriesSeen`.
+
+**Saúde da lista.** Ao abrir, o `App` lê o cache e testa a lista em paralelo (`checkHealth`: login + categorias, 6 s no máximo, não gasta conexão). Falhou (servidor, catálogo ou conta) = tela `status` com motivo, histórico e nova tentativa a cada 30 s; segue sozinho quando volta. Aviso (vence em ≤ 3 dias, todas as telas em uso) = toast e segue. O teste completo (Configurações › Listas › Diagnóstico, ou verde no erro do player) também lê o começo de 2 canais (a pior qualidade) e dos 3 filmes mais novos (`catalog.healthSamples`; passa se algum abrir) e da grade: **gasta uma conexão por alguns segundos**, por isso nunca roda ao abrir nem com o player tocando. Erro no player e na sincronização refaz o teste rápido para dizer se é o servidor ou só aquele vídeo. Histórico em `nyx:health` (20 últimas); `[saúde]` vai para o relatório.
 
 **Qualidade automática.** O provedor entrega cada qualidade como stream separado. `pickStart` escolhe por onde começar (salvo do canal > preferência > melhor abaixo). O `StallMonitor` decide quando trocar (não abriu em 9 s, 3 travadas por minuto ou 7 s carregando), e `nextFallback` desce primeiro e só depois sobe. A qualidade que desceu sozinha fica só na sessão.
 

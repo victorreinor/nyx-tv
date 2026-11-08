@@ -22,6 +22,7 @@ export function t(key: MessageKey, vars?: Record<string, string | number>): stri
 
 const timeFmt: Partial<Record<Locale, Intl.DateTimeFormat>> = {};
 const dayFmt: Partial<Record<Locale, Intl.DateTimeFormat>> = {};
+const yearFmt: Partial<Record<Locale, Intl.DateTimeFormat>> = {};
 
 /** 21:42 */
 export function fmtTime(epochSec: number): string {
@@ -35,6 +36,18 @@ export function fmtDay(epochSec: number): string {
   const l = settings.locale;
   const f = dayFmt[l] || (dayFmt[l] = new Intl.DateTimeFormat(l, { weekday: 'short', day: 'numeric', month: 'short' }));
   return f.format(new Date(epochSec * 1000));
+}
+
+/** Hoje: "11:24". Este ano: "seg., 9 de nov. 11:24". Outro ano: "8 de nov. de 2027 11:24". */
+export function fmtWhen(epochMs: number): string {
+  const d = new Date(epochMs);
+  const now = new Date();
+  const time = fmtTime(epochMs / 1000);
+  if (d.toDateString() === now.toDateString()) return time;
+  if (d.getFullYear() === now.getFullYear()) return `${fmtDay(epochMs / 1000)} ${time}`;
+  const l = settings.locale;
+  const f = yearFmt[l] || (yearFmt[l] = new Intl.DateTimeFormat(l, { day: 'numeric', month: 'short', year: 'numeric' }));
+  return `${f.format(d)} ${time}`;
 }
 
 /** 23 min · 1h 05 */

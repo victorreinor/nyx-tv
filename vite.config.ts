@@ -37,13 +37,31 @@ function devProxy(): Plugin {
           res.end('url inválida');
           return;
         }
+        // repassa aos poucos: o teste de saúde lê só o começo de um canal ao vivo (que não termina)
+        const ctrl = new AbortController();
+        res.on('close', () => ctrl.abort());
         try {
-          const upstream = await fetch(target, { headers: { 'User-Agent': 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0)' } });
+          const headers: Record<string, string> = { 'User-Agent': 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0)' };
+          if (req.headers.range) headers.Range = String(req.headers.range);
+          const upstream = await fetch(target, { headers, signal: ctrl.signal });
           res.statusCode = upstream.status;
           res.setHeader('Content-Type', upstream.headers.get('content-type') ?? 'application/octet-stream');
-          res.end(Buffer.from(await upstream.arrayBuffer()));
+          res.setHeader('X-Final-Url', upstream.url);
+          if (!upstream.body) return void res.end();
+          const reader = upstream.body.getReader();
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            res.write(value);
+          }
+          res.end();
         } catch (err) {
-          res.statusCode = 502;
+          if (ctrl.signal.aborted) return;
+          if (!res.headersSent) {
+            res.statusCode = 502;
+            // o teste de saúde trata como falha de rede, igual à TV (que não tem proxy no meio)
+            res.setHeader('X-Proxy-Error', '1');
+          }
           res.end(String(err));
         }
       });

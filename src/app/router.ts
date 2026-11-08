@@ -26,7 +26,9 @@ export type Route =
   | { name: 'player'; media: Media }
   | { name: 'welcome' }
   | { name: 'sync' }
-  | { name: 'playlistForm'; id?: string };
+  | { name: 'playlistForm'; id?: string }
+  /** Diagnóstico da lista. `boot`: aberto porque a lista não respondeu ao abrir o app. */
+  | { name: 'status'; boot?: boolean; hasData?: boolean };
 
 const [stack, setStack] = createSignal<Route[]>([{ name: 'home' }]);
 export { stack };

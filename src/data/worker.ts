@@ -25,8 +25,11 @@ import type {
 } from './types';
 import { UserStore } from './user';
 import { configureTmdb, pruneTmdb, tmdbEnabled, tmdbMovie, tmdbSeason, tmdbSeries } from './tmdb';
-import type { TmdbView } from './types';
+import type { HealthReport, TmdbView } from './types';
 import * as xc from './xtream';
+import { markAdultByContent } from './normalize';
+import { diffEpisodes, episodeRef, flatEpisodes } from './newEpisodes';
+import { runHealth } from './health';
 
 const ctx = self as unknown as { postMessage(m: unknown): void; onmessage: ((e: MessageEvent) => void) | null };
 
@@ -40,6 +43,10 @@ let syncing: Promise<Stats> | null = null;
 const seriesInfoCache = new Map<number, SeriesInfo>();
 const movieInfoCache = new Map<number, MovieInfo>();
 const MAX_INFO = 40;
+/** Página da série e conferência de episódio novo pedem a mesma lista ao mesmo tempo: um pedido só. */
+const seriesInfoPending = new Map<number, Promise<SeriesInfo>>();
+/** Conferências de episódio novo por rodada (uma consulta ao provedor cada). */
+const MAX_NEW_EP_CHECKS = 20;
 
 /** Guarda no cache com limite: o item mais antigo sai primeiro. */
 function remember<K, V>(map: Map<K, V>, key: K, value: V) {
@@ -115,6 +122,12 @@ async function saveCatalog(pid: string) {
   await saveMeta(pid);
 }
 
+/** Categorias adultas pelo conteúdo, além do nome (o controle parental esconde). */
+function markAdult(categories: Category[], channels: Channel[], movies: Movie[], series: Series[]) {
+  const n = markAdultByContent(channels, categories) + markAdultByContent(movies, categories) + markAdultByContent(series, categories);
+  if (n) console.log('[adulto] categorias marcadas pelo conteúdo:', n);
+}
+
 async function syncXtream(p: PlaylistConfig) {
   emit({ type: 'progress', phase: 'categories', pct: 5 });
   const [lc, vc, sc] = await Promise.all([
@@ -136,7 +149,9 @@ async function syncXtream(p: PlaylistConfig) {
     xc.fetchJSON(xc.apiUrl(p, 'get_vod_streams'), 180000).then((r) => (step('movies'), xc.mapMovies(r, adult))),
     xc.fetchJSON(xc.apiUrl(p, 'get_series'), 180000).then((r) => (step('series'), xc.mapSeries(r, adult))),
   ]);
+  markAdult(categories, channels, movies, series);
   catalog.setCatalog({ channels, movies, series, categories, at: Date.now() });
+  catalog.afterSync();
   emit({ type: 'progress', phase: 'saving', pct: 80 });
   await saveCatalog(p.id);
   emit({ type: 'updated', stats: catalog.stats() });
@@ -147,7 +162,9 @@ async function syncM3u(p: PlaylistConfig) {
   const text = await xc.fetchText(String(p.url), 300000);
   emit({ type: 'progress', phase: 'movies', pct: 50 });
   const m = parseM3u(text);
+  markAdult(m.categories, m.live, m.movies, m.series);
   catalog.setCatalog({ channels: m.live, movies: m.movies, series: m.series, categories: m.categories, m3uEpisodes: m.episodes, at: Date.now() });
+  catalog.afterSync();
   if (!p.epgUrl && m.epgUrl) p.epgUrl = m.epgUrl;
   emit({ type: 'progress', phase: 'saving', pct: 80 });
   await saveCatalog(p.id);
@@ -186,11 +203,68 @@ function runSync(what: 'all' | 'epg'): Promise<Stats> {
     } catch (err) {
       emit({ type: 'error', message: 'epg: ' + String((err as Error).message || err) });
     }
+    // depois da grade: não disputa a rede nem o processador com o XMLTV
+    if (what === 'all') void verifyNewEpisodes();
     return catalog.stats();
   })().finally(() => {
     syncing = null;
   });
   return syncing;
+}
+
+/**
+ * Episódios da série. `cache`: guarda no LRU das páginas (a conferência de episódio novo não guarda,
+ * para não tirar do cache as séries que você está navegando). Pedidos iguais em paralelo viram um só.
+ */
+async function loadSeriesInfo(id: number, cache: boolean): Promise<SeriesInfo | null> {
+  const series = catalog.seriesById.get(id);
+  if (!series) return null;
+  const cached = seriesInfoCache.get(id);
+  if (cached) return cached;
+  const p = current();
+  let info: SeriesInfo;
+  if (p.type === 'xtream') {
+    let pending = seriesInfoPending.get(id);
+    if (!pending) {
+      pending = xc.fetchSeriesInfo(p, series).finally(() => seriesInfoPending.delete(id));
+      seriesInfoPending.set(id, pending);
+    }
+    info = await pending;
+  } else {
+    const eps = (catalog.m3uEpisodes && catalog.m3uEpisodes.get(id)) || [];
+    const bySeason = new Map<number, Episode[]>();
+    eps.forEach((e) => bySeason.set(e.season, (bySeason.get(e.season) || []).concat(e)));
+    info = { series, seasons: Array.from(bySeason.entries()).sort((a, b) => a[0] - b[0]).map(([season, episodes]) => ({ season, episodes })) };
+  }
+  if (cache) remember(seriesInfoCache, id, info);
+  return info;
+}
+
+let verifying = false;
+/**
+ * Confere as séries que você acompanha e mudaram no provedor: houve episódio novo mesmo? Qual?
+ * Uma consulta por série, em sequência, só para as que mudaram desde a última conferência.
+ */
+async function verifyNewEpisodes() {
+  if (verifying || !playlist || !catalog.hasData) return;
+  verifying = true;
+  // só recarrega as telas se algum selo apareceu (antes da conferência a série fica sem selo)
+  let badges = 0;
+  try {
+    for (const s of catalog.newEpisodeCandidates(MAX_NEW_EP_CHECKS)) {
+      const ref = user.knownEpisodes(s.id);
+      // sem referência (só favoritou antes desta versão), não precisa consultar: selo genérico
+      // falha de rede: não anota, tenta de novo na próxima abertura
+      const info = ref ? await loadSeriesInfo(s.id, false).catch(() => null) : null;
+      if (ref && !info) continue;
+      const res = diffEpisodes(info ? flatEpisodes(info) : [], ref, s.added);
+      user.setNewEpisodes(s.id, res);
+      if (res.count !== 0) badges++;
+    }
+  } finally {
+    verifying = false;
+  }
+  if (badges) emit({ type: 'updated', stats: catalog.stats() });
 }
 
 function background(what: 'all' | 'epg') {
@@ -214,6 +288,8 @@ const api = {
     await user.load(p.id);
     const had = await loadSnapshot(p.id).catch(() => false);
     const st = catalog.stats();
+    // depois do boot (não disputa a rede com a abertura); a sincronização também confere ao terminar
+    if (had) setTimeout(() => void verifyNewEpisodes(), 8000);
     if (had && Date.now() - st.catalogAt > CATALOG_TTL) background('all');
     else if (had && Date.now() - st.epgAt > EPG_TTL) background('epg');
     return { hasData: had, stats: st };
@@ -223,16 +299,22 @@ const api = {
     return runSync('all');
   },
 
-  /** Testa a lista antes de salvar (Xtream: login na API; M3U: baixa o começo do arquivo). */
-  async check(p: PlaylistConfig, dev: boolean): Promise<{ ok: boolean; message: string }> {
+  /**
+   * Saúde da lista (abrir o app, tela de diagnóstico, erro no player). Nunca lança erro.
+   * Completo: também lê o começo de canais, filmes (`catalog.healthSamples`) e da grade.
+   */
+  health(p: PlaylistConfig, full: boolean, format: 'ts' | 'm3u8', dev: boolean): Promise<HealthReport> {
     xc.useDevProxy(dev);
-    if (p.type === 'xtream') return xc.checkAccount(p);
-    try {
-      const text = await xc.fetchText(String(p.url), 60000);
-      return text.indexOf('#EXTM3U') !== -1 || text.indexOf('#EXTINF') !== -1 ? { ok: true, message: 'ok' } : { ok: false, message: 'm3u' };
-    } catch (err) {
-      return { ok: false, message: String((err as Error).message || err) };
-    }
+    if (!full || !playlist || playlist.id !== p.id) return runHealth(p, { full });
+    const { channels, movies } = catalog.healthSamples();
+    return runHealth(p, {
+      full,
+      liveUrls: channels.map((ch) => {
+        const v = ch.variants[ch.variants.length - 1];
+        return v.url || xc.liveUrl(p, v.streamId, format);
+      }),
+      movieUrls: movies.map((m) => m.url || xc.movieUrl(p, m.id, m.ext)),
+    });
   },
 
   isSyncing(): boolean {
@@ -307,23 +389,8 @@ const api = {
     return info;
   },
 
-  async seriesInfo(id: number): Promise<SeriesInfo | null> {
-    const series = catalog.seriesById.get(id);
-    if (!series) return null;
-    const cached = seriesInfoCache.get(id);
-    if (cached) return cached;
-    const p = current();
-    let info: SeriesInfo;
-    if (p.type === 'xtream') {
-      info = await xc.fetchSeriesInfo(p, series);
-    } else {
-      const eps = (catalog.m3uEpisodes && catalog.m3uEpisodes.get(id)) || [];
-      const bySeason = new Map<number, Episode[]>();
-      eps.forEach((e) => bySeason.set(e.season, (bySeason.get(e.season) || []).concat(e)));
-      info = { series, seasons: Array.from(bySeason.entries()).sort((a, b) => a[0] - b[0]).map(([season, episodes]) => ({ season, episodes })) };
-    }
-    remember(seriesInfoCache, id, info);
-    return info;
+  seriesInfo(id: number): Promise<SeriesInfo | null> {
+    return loadSeriesInfo(id, true);
   },
 
   /** URLs de reprodução. Canais: todas as variantes, da melhor para a pior. */
@@ -399,8 +466,11 @@ const api = {
     return tmdbSeason(tvId, season).catch(() => null);
   },
 
-  markSeriesSeen(seriesId: number) {
+  /** Abriu a página da série: o selo some e os episódios de agora viram a referência do próximo "novo". */
+  async markSeriesSeen(seriesId: number) {
     user.markSeriesSeen(seriesId);
+    const info = await api.seriesInfo(seriesId).catch(() => null);
+    if (info) user.setSeenEpisodes(seriesId, episodeRef(flatEpisodes(info)));
   },
 
   /** Configurações › Histórico. */

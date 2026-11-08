@@ -14,6 +14,7 @@ import { Badge, Toggle } from '../ui/primitives';
 import { PinDialog } from '../ui/overlays';
 import { VGrid } from '../ui/VGrid';
 import { applyUpdate, checkForUpdate, running, updateStatus } from '../app/update';
+import { health, healthLine, syncErrorText } from '../app/health';
 
 type SectionId = 'playlists' | 'language' | 'parental' | 'player' | 'categories' | 'history' | 'tmdb' | 'storage' | 'about';
 const SECTIONS: { id: SectionId; icon: OptionItem['icon'] }[] = [
@@ -118,7 +119,7 @@ function PlaylistsPanel() {
       await runSync();
       toast(t('toast.updated'));
     } catch (err) {
-      toast(t('sync.error', { msg: String((err as Error).message || err) }), 5000);
+      toast(await syncErrorText(err), 6000);
     }
   }
   async function remove(p: PlaylistConfig) {
@@ -137,6 +138,7 @@ function PlaylistsPanel() {
     const list: Action[] = active(p)
       ? [{ label: t('playlist.refresh'), icon: 'refresh', onSelect: refresh }]
       : [{ label: t('playlist.activate'), icon: 'check', variant: 'primary', onSelect: () => activate(p) }];
+    if (active(p)) list.push({ label: t('health.diagnose'), icon: 'info', onSelect: () => go({ name: 'status' }) });
     list.push({ label: t('playlist.edit.short'), icon: 'edit', onSelect: () => go({ name: 'playlistForm', id: p.id }) });
     list.push({ label: confirm() === p.id ? t('playlist.removeConfirm') : t('playlist.remove'), icon: 'trash', variant: 'danger', onSelect: () => remove(p) });
     return list;
@@ -168,6 +170,11 @@ function PlaylistsPanel() {
                 <Stat value={stats()!.epgUntil ? fmtDay(stats()!.epgUntil) : '—'} label={t('stats.epgDays')} />
               </div>
               <span class="t-caption c-3">{stats()!.catalogAt ? t('playlist.updatedAgo', { t: fmtAgo(stats()!.catalogAt) }) : ''}</span>
+            </Show>
+            <Show when={active(p) && health()}>
+              <span class={'t-caption tone-' + health()!.state}>
+                {health()!.state === 'ok' ? t('health.card', { t: fmtAgo(health()!.at) }) : healthLine(health()!)}
+              </span>
             </Show>
             <ActionRow actions={() => playlistActions(p)} />
           </div>
@@ -384,7 +391,7 @@ function StoragePanel() {
               toast(t('sync.live'), 60000);
               runSync()
                 .then(() => toast(t('toast.updated')))
-                .catch((err) => toast(t('sync.error', { msg: String((err as Error).message || err) }), 5000));
+                .catch(async (err) => toast(await syncErrorText(err), 6000));
             },
           },
         ]}

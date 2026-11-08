@@ -31,5 +31,8 @@ export function usePaged<T>(fetchPage: (cursor: string | null) => Promise<Page<T
 
   createEffect(on(deps, () => load(true)));
 
-  return { items, total, loaded, more: () => load(false), reload: () => load(true) };
+  /** Troca itens já carregados sem buscar de novo (ex.: a estrela de favorito). */
+  const update = (fn: (list: T[]) => T[]) => setItems(fn(items()));
+
+  return { items, total, loaded, more: () => load(false), reload: () => load(true), update };
 }

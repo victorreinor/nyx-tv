@@ -6,7 +6,7 @@ import { FocusZone, type ListHandle } from '../app/focus';
 import { fmtDay, fmtTime, t } from '../app/i18n';
 import { playChannel } from '../app/play';
 import { usePaged } from '../app/paged';
-import { dataVersion, lastChannel, stats, toast } from '../app/state';
+import { dataVersion, favChange, lastChannel, stats, toast, toggleFav } from '../app/state';
 import { hasReminder, settings, toggleReminder } from '../app/settings';
 import { Icon } from '../ui/Icon';
 import { top } from '../app/router';
@@ -51,6 +51,19 @@ export function Live() {
   const rows = usePaged(
     (c) => call('guide', category(), c, 40, range().from, range().to),
     () => [category(), range(), dataVersion()],
+  );
+
+  // favoritou aqui ou no player: a estrela muda na hora (na aba Favoritos, a lista refaz)
+  createEffect(
+    on(
+      favChange,
+      (ch) => {
+        if (!ch || ch.kind !== 'live') return;
+        if (category() === 'fav') rows.reload();
+        else rows.update((list) => list.map((r) => (r.id === ch.id ? { ...r, fav: ch.on } : r)));
+      },
+      { defer: true },
+    ),
   );
 
   // Voltou do player para a grade: volta para "agora" e para o canal que estava tocando.
@@ -143,10 +156,7 @@ export function Live() {
       return true;
     }
     if (k === 'blue') {
-      call('toggleFav', 'live', row.id).then((on) => {
-        toast(on ? t('toast.favAdded') : t('toast.favRemoved'));
-        if (category() === 'fav') rows.reload();
-      });
+      void toggleFav('live', row.id);
       return true;
     }
     return false;

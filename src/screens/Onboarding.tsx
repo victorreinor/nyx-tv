@@ -1,5 +1,7 @@
 // Primeira abertura: boas-vindas (sem lista) e preparação (primeira sincronização).
-import { onMount, Show } from 'solid-js';
+import { createSignal, onMount, Show } from 'solid-js';
+import type { HealthReport } from '../data/types';
+import { failingReport, healthLine, healthMessage } from '../app/health';
 import { FocusZone } from '../app/focus';
 import { type MessageKey, t } from '../app/i18n';
 import { go, reset } from '../app/router';
@@ -22,12 +24,19 @@ export function Welcome() {
 }
 
 export function SyncScreen() {
+  // falhou: o teste da lista diz se é o servidor, a conta ou outra coisa
+  const [diag, setDiag] = createSignal<HealthReport | null>(null);
   // abre a lista no worker antes (garante o estado mesmo se o boot falhou) e sincroniza
-  const start = () =>
-    openActive()
+  const start = () => {
+    setDiag(null);
+    return openActive()
       .then(() => runSync())
       .then(() => reset({ name: 'home' }))
-      .catch((err) => console.error('sync falhou', err));
+      .catch((err) => {
+        console.error('sync falhou', err);
+        return failingReport().then(setDiag);
+      });
+  };
   onMount(start);
   const label = () => t(('sync.' + sync().phase) as MessageKey);
   return (
@@ -42,13 +51,26 @@ export function SyncScreen() {
         <ProgressBar value={sync().pct / 100} height={10} />
       </div>
       <Show when={sync().error} fallback={<p class="t-caption c-3">{t('sync.firstHint')}</p>}>
-        <p class="t-caption" style={{ color: 'var(--live-fg)' }}>
-          {t('sync.error', { msg: sync().error })}
-        </p>
+        <Show
+          when={diag()}
+          fallback={
+            <p class="t-caption" style={{ color: 'var(--live-fg)' }}>
+              {t('sync.error', { msg: sync().error })}
+            </p>
+          }
+        >
+          {(r) => (
+            <div class="stack g8" style={{ 'max-width': '1100px' }}>
+              <p class="t-section" style={{ color: 'var(--live-fg)' }}>{healthLine(r())}</p>
+              <p class="t-body c-2">{healthMessage(r()).sub}</p>
+            </div>
+          )}
+        </Show>
         <FocusZone axis="row" autofocus>
           <ActionRow
             actions={() => [
               { label: t('common.retry'), icon: 'refresh', variant: 'primary', onSelect: start },
+              { label: t('health.diagnose'), icon: 'info', onSelect: () => go({ name: 'status' }) },
               { label: t('settings.playlists'), onSelect: () => go({ name: 'settings' }) },
             ]}
           />

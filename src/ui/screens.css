@@ -154,7 +154,9 @@
 /* ---------- camada de vídeo (motor único) ---------- */
 .video-layer { position: absolute; z-index: 0; background: #000; }
 object.video-layer { background: transparent; }
-.player__seek { justify-items: center; padding: 28px 44px; border-radius: var(--r-panel); background: rgba(10, 10, 18, 0.82); border: 1px solid var(--line); }
+/* painel flutuante do player (salto, erro) */
+.player__seek, .player__error { justify-items: center; border-radius: var(--r-panel); background: rgba(10, 10, 18, 0.82); border: 1px solid var(--line); }
+.player__seek { padding: 28px 44px; }
 .player__seek-time { font-size: 64px; font-weight: 800; letter-spacing: -0.02em; }
 .player__seek-delta { font-size: 26px; font-weight: 700; color: var(--ring); }
 .settings__subtitle { margin-top: 16px; }
@@ -196,3 +198,24 @@ html.is-playing { background: transparent; }
 .search__viewport { height: 920px; }
 .search__grid { height: 820px; overflow: hidden; }
 .search__viewport { overflow: visible; }
+
+/* ---------- diagnóstico da lista ---------- */
+.status-page { padding: 72px var(--safe-x) 0; align-content: start; }
+.status__head { display: grid; grid-template-columns: 96px 1fr; align-items: start; column-gap: 28px; max-width: 1500px; }
+.status__icon { width: 96px; height: 96px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--ok-bg); color: var(--ok); }
+.status__head.is-warn .status__icon { background: var(--warn-bg); color: var(--warn); }
+.status__head.is-fail .status__icon { background: var(--warn-bg); color: var(--live-fg); }
+.status__steps { max-width: 1600px; }
+.status-step { display: grid; grid-template-columns: 48px 220px 1fr 420px; align-items: center; column-gap: 20px; padding: 16px 24px; border-radius: 14px; background: var(--s1); border: 1px solid var(--line); }
+.status-step__mark { font-size: 26px; font-weight: 800; text-align: center; color: var(--t3); }
+.status-step.is-skip { opacity: 0.55; }
+.status-step > :last-child { text-align: right; }
+.status__log { display: flex; flex-wrap: wrap; max-width: 1600px; }
+.status__log-item { margin: 0 12px 12px 0; padding: 8px 16px; border-radius: 999px; background: var(--s1); font-size: 20px; color: var(--t2); }
+.player__error { text-align: center; max-width: 1200px; padding: 40px 56px; }
+.player__diag { color: var(--t1); }
+
+/* cor por estado (diagnóstico, cartão da lista): no fim, para valer sobre a cor base do elemento */
+.tone-ok { color: var(--ok); }
+.tone-warn { color: var(--warn); }
+.tone-fail { color: var(--live-fg); }

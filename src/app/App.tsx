@@ -27,6 +27,8 @@ import { Favorites } from '../screens/Favorites';
 import { Settings } from '../screens/Settings';
 import { PlaylistForm } from '../screens/PlaylistForm';
 import { SyncScreen, Welcome } from '../screens/Onboarding';
+import { Status } from '../screens/Status';
+import { checkHealth, healthMessage } from './health';
 
 const STALE_KEY_MS = 1500;
 
@@ -45,6 +47,7 @@ function renderRoute(r: Route): JSX.Element {
     case 'welcome': return <Welcome />;
     case 'sync': return <SyncScreen />;
     case 'playlistForm': return <PlaylistForm id={r.id} />;
+    case 'status': return <Status boot={r.boot} hasData={r.hasData} />;
   }
 }
 
@@ -110,11 +113,20 @@ export function App() {
     seedPlaylist();
     if (!activePlaylist()) reset({ name: 'welcome' });
     else {
-      const hasData = await openActive().catch((err) => {
-        console.error('abrir lista falhou', err);
-        return false;
-      });
-      reset({ name: hasData ? 'home' : 'sync' });
+      // cache e teste da lista em paralelo: com a lista de pé, o teste leva ~0,5 s; fora do ar, no máximo 6 s
+      const [hasData, report] = await Promise.all([
+        openActive().catch((err) => {
+          console.error('abrir lista falhou', err);
+          return false;
+        }),
+        checkHealth(false),
+      ]);
+      if (report && report.state === 'fail') reset({ name: 'status', boot: true, hasData });
+      else {
+        reset({ name: hasData ? 'home' : 'sync' });
+        // aviso que não impede de assistir: vence em breve ou todas as telas em uso
+        if (report && report.state === 'warn') setTimeout(() => toast(healthMessage(report).title, 6000), 1500);
+      }
     }
     setBooted(true);
   });
@@ -172,7 +184,12 @@ export function App() {
 function Splash() {
   return (
     <div class="fill" style={{ display: 'flex', 'align-items': 'center', 'justify-content': 'center' }}>
-      <Spinner size={64} />
+      <div class="stack g24" style={{ 'justify-items': 'center' }}>
+        <Spinner size={64} />
+        <Show when={activePlaylist()}>
+          <span class="t-body c-2">{t('health.checking')}</span>
+        </Show>
+      </div>
     </div>
   );
 }

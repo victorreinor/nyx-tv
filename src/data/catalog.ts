@@ -21,6 +21,7 @@ import type {
   SortKey,
   Stats,
 } from './types';
+import type { NewEpisodes } from './newEpisodes';
 import { isStarted, WATCHED, type UserStore } from './user';
 
 type Item = Channel | Movie | Series;
@@ -82,6 +83,87 @@ export class Catalog {
     count(d.series);
     this.categories.forEach((c) => (c.count = counts.get(c.id) || 0));
     this.cache.clear();
+  }
+
+  /** Índice por título (o mesmo nome, sem selos de versão/ano). */
+  private titleIdx(kind: 'movie' | 'series'): Map<string, Item[]> {
+    let idx = this.titleIndex[kind];
+    if (!idx) {
+      idx = new Map();
+      for (const it of this.source(kind)) {
+        const k = searchKey(displayTitle(it.name));
+        const list = idx.get(k);
+        if (list) list.push(it);
+        else idx.set(k, [it]);
+      }
+      this.titleIndex[kind] = idx;
+    }
+    return idx;
+  }
+
+  private uniqueByTitle(kind: 'movie' | 'series', title: string): Item | null {
+    const list = title ? this.titleIdx(kind).get(searchKey(displayTitle(title))) : undefined;
+    return list && list.length === 1 ? list[0] : null;
+  }
+
+  /**
+   * Depois de sincronizar: o provedor pode ter reimportado e trocado os ids, e o progresso sumiria
+   * das listas. Reencontra pelo título, só quando há exatamente um item com esse nome. Também esquece
+   * a referência de "novo episódio" de séries que saíram do catálogo.
+   */
+  afterSync() {
+    const all = this.user.state.progress;
+    let n = 0;
+    for (const k of Object.keys(all)) {
+      const p = all[k];
+      if (p.kind === 'movie') {
+        if (this.movieById.has(Number(p.id))) continue;
+        const hit = this.uniqueByTitle('movie', p.title);
+        if (!hit) continue;
+        delete all[k];
+        const key = 'm:' + hit.id;
+        if (!all[key] || all[key].updatedAt < p.updatedAt) all[key] = { ...p, key, id: String(hit.id) };
+        n++;
+      } else if (p.seriesId && !this.seriesById.has(p.seriesId)) {
+        const hit = this.uniqueByTitle('series', p.title);
+        if (!hit) continue;
+        all[k] = { ...p, seriesId: hit.id as number };
+        n++;
+      }
+    }
+    if (n) this.user.progressChanged();
+    this.user.pruneSeries((id) => this.seriesById.has(id));
+  }
+
+  /** Você acompanha a série (abriu, favoritou ou assistiu) e ela mudou no provedor depois disso. */
+  private changedSinceFollowed(s: Series): boolean {
+    const base = this.user.seriesBaseline(s.id);
+    return base > 0 && s.added > base;
+  }
+
+  /** Selo de episódio novo: só depois de conferido na lista de episódios (count -1 = sem referência, selo genérico). */
+  newEpisodeOf(s: Series): NewEpisodes | null {
+    const r = this.user.state.newEpisodes[String(s.id)];
+    return r && r.added === s.added && r.count !== 0 && this.changedSinceFollowed(s) ? r : null;
+  }
+
+  /** Séries que você acompanha, mudaram no provedor e ainda não foram conferidas (as mais recentes primeiro). */
+  newEpisodeCandidates(max: number): Series[] {
+    return this.series
+      .filter((s) => {
+        const r = this.user.state.newEpisodes[String(s.id)];
+        return (!r || r.added !== s.added) && this.changedSinceFollowed(s) && this.visible(s);
+      })
+      .sort((a, b) => b.added - a.added)
+      .slice(0, max);
+  }
+
+  /** Teste completo da lista: 2 canais (a pior qualidade, que abre mais fácil) e os 3 filmes mais novos (arquivo antigo some do provedor). */
+  healthSamples(): { channels: Channel[]; movies: Movie[] } {
+    const channels: Channel[] = [];
+    for (const ch of this.channels) if (!ch.adult && ch.variants.length && channels.push(ch) === 2) break;
+    const movies = (this.list('movie', 'recent', 'added') as Movie[]).filter((m) => !m.adult).slice(0, 3);
+    return { channels, movies };
   }
 
   private epgUntil = 0;
@@ -164,9 +246,10 @@ export class Catalog {
     const items = this.source(kind).filter((it) => {
       if (!this.visible(it)) return false;
       const p = this.progressOf(kind, it);
-      if (!p || !p.duration) return false;
-      const pct = p.position / p.duration;
-      const done = pct >= WATCHED && !(kind === 'series' && p.next);
+      if (!p) return false;
+      // sem duração (o player não informou): conta pelo tempo assistido, igual à Início
+      const pct = p.duration ? p.position / p.duration : 0;
+      const done = !!p.duration && pct >= WATCHED && !(kind === 'series' && p.next);
       const keep = category === 'watched' ? done : isStarted(p) && !done;
       if (keep) when.set(it.id, p.updatedAt);
       return keep;
@@ -217,17 +300,7 @@ export class Catalog {
    * (mesmo título, traduzido ou original, e ano próximo).
    */
   matchRecommendations(kind: 'movie' | 'series', recs: { title: string; original: string; year: number }[], excludeId: number): CardItem[] {
-    let idx = this.titleIndex[kind];
-    if (!idx) {
-      idx = new Map();
-      for (const it of this.source(kind)) {
-        const k = searchKey(displayTitle(it.name));
-        const list = idx.get(k);
-        if (list) list.push(it);
-        else idx.set(k, [it]);
-      }
-      this.titleIndex[kind] = idx;
-    }
+    const idx = this.titleIdx(kind);
     const out: CardItem[] = [];
     const seen = new Set<string | number>([excludeId]);
     for (const r of recs) {
@@ -282,7 +355,7 @@ export class Catalog {
     }
     const s = it as Series;
     const p = this.user.latestForSeries(s.id);
-    const baseline = this.user.seriesBaseline(s.id);
+    const fresh = this.newEpisodeOf(s);
     const pct = p && p.duration ? p.position / p.duration : 0;
     const finished = pct >= WATCHED;
     const at = p ? (finished && p.next ? { s: p.next.season, e: p.next.episode } : { s: p.season || 1, e: p.episode || 1 }) : null;
@@ -296,7 +369,7 @@ export class Catalog {
       tag: at ? `${at.s}|${at.e}` : undefined,
       progress: p && !finished && isStarted(p) ? pct : undefined,
       watched: !!p && finished && !p.next,
-      newEpisode: baseline > 0 && s.added > baseline,
+      newEp: fresh ? { s: fresh.s, e: fresh.e, count: fresh.count } : undefined,
       versions: versionTags(s.name),
     };
   }
@@ -380,7 +453,6 @@ export class Catalog {
 
   continueItems(limit: number): CardItem[] {
     const out: CardItem[] = [];
-    const seenSeries = new Set<number>();
     for (const p of this.user.recentProgress()) {
       if (out.length >= limit) break;
       const pct = p.duration ? p.position / p.duration : 0;
@@ -390,13 +462,12 @@ export class Catalog {
         out.push({ ...this.card('movie', m), sub: remaining(p), progress: pct, resume: { position: p.position } });
         continue;
       }
-      if (!p.seriesId || seenSeries.has(p.seriesId)) continue;
-      seenSeries.add(p.seriesId);
+      // cada série entra uma vez, pelo episódio que a representa (mesma regra da capa e da página)
+      if (!p.seriesId || p !== this.user.latestForSeries(p.seriesId) || (pct < WATCHED && !isStarted(p))) continue;
       const s = this.seriesById.get(p.seriesId);
       if (!s || !this.visible(s)) continue;
       const base = this.card('series', s);
       if (pct < WATCHED) {
-        if (!isStarted(p)) continue;
         out.push({ ...base, sub: `T${p.season} E${p.episode} · ${remaining(p)}`, progress: pct, resume: { episodeId: p.id, season: p.season, episode: p.episode, ext: p.ext, position: p.position } });
       } else if (p.next) {
         out.push({ ...base, sub: `T${p.next.season} E${p.next.episode}`, progress: 0, resume: { episodeId: p.next.id, season: p.next.season, episode: p.next.episode, ext: p.next.ext, position: 0 } });
@@ -418,8 +489,10 @@ export class Catalog {
     const recentMovies = this.page('movie', 'recent', 'added', null, 20).items;
     const recentSeries = this.page('series', 'recent', 'added', null, 20).items;
     // séries que você acompanha (favorita, assistiu ou abriu) e ganharam episódio depois disso
-    const newEpisodes = this.series
-      .filter((s) => this.visible(s) && this.user.seriesBaseline(s.id) > 0 && s.added > this.user.seriesBaseline(s.id))
+    // só as conferidas podem ter selo: percorre essas (poucas), não o catálogo inteiro
+    const newEpisodes = Object.keys(this.user.state.newEpisodes)
+      .map((id) => this.seriesById.get(Number(id)))
+      .filter((s): s is Series => !!s && this.visible(s) && !!this.newEpisodeOf(s))
       .sort((a, b) => b.added - a.added)
       .slice(0, 20)
       .map((s) => this.card('series', s));

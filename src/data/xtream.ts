@@ -19,11 +19,14 @@ export function useDevProxy(on: boolean) {
   viaProxy = on;
 }
 
+/** No dev, passa pelo proxy do Vite (o provedor não manda CORS). */
+const proxied = (url: string) => (viaProxy ? '/__proxy?url=' + encodeURIComponent(url) : url);
+
 export async function fetchText(url: string, timeoutMs = 60000): Promise<string> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(viaProxy ? '/__proxy?url=' + encodeURIComponent(url) : url, { signal: ctrl.signal });
+    const res = await fetch(proxied(url), { signal: ctrl.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.text();
   } finally {
@@ -32,7 +35,85 @@ export async function fetchText(url: string, timeoutMs = 60000): Promise<string>
 }
 
 export async function fetchJSON<T = any>(url: string, timeoutMs?: number): Promise<T> {
-  return JSON.parse(await fetchText(url, timeoutMs));
+  const text = await fetchText(url, timeoutMs);
+  try {
+    return JSON.parse(text);
+  } catch {
+    // servidor fora costuma responder 200 com uma página HTML: diz isso em vez de "Unexpected token <"
+    throw new Error(/^\s*</.test(text) ? 'o servidor devolveu uma página (HTML) em vez de dados' : 'resposta inválida do servidor');
+  }
+}
+
+export interface ProbeResult {
+  /** 0 = não chegou resposta. */
+  status: number;
+  ms: number;
+  timedOut: boolean;
+  error: string;
+  type: string;
+  bytes: number;
+  /** Primeiro byte (TS começa com 0x47); -1 = vazio. */
+  first: number;
+  /** Começo do corpo como texto (até `textMax`). */
+  text: string;
+  /** Endereço final, depois de redirecionamentos (HLS resolve os segmentos por ele). */
+  url: string;
+}
+
+/**
+ * Teste de rede que nunca lança erro: lê no máximo `maxBytes` e fecha a conexão.
+ * Stream ao vivo não termina; por isso lê só o começo (e libera a conexão da conta na hora).
+ */
+export async function probe(url: string, timeoutMs: number, maxBytes: number, opts: { textMax?: number; range?: boolean } = {}): Promise<ProbeResult> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const t0 = Date.now();
+  const out: ProbeResult = { status: 0, ms: 0, timedOut: false, error: '', type: '', bytes: 0, first: -1, text: '', url };
+  const chunks: Uint8Array[] = [];
+  try {
+    const headers: Record<string, string> = opts.range ? { Range: `bytes=0-${maxBytes - 1}` } : {};
+    const res = await fetch(proxied(url), { signal: ctrl.signal, headers });
+    if (viaProxy && res.headers.get('x-proxy-error')) throw new Error((await res.text()).slice(0, 120));
+    out.status = res.status;
+    out.type = res.headers.get('content-type') || '';
+    out.url = (viaProxy ? res.headers.get('x-final-url') : res.url) || url;
+    if (res.body) {
+      const reader = res.body.getReader();
+      const textMax = opts.textMax || 2048;
+      while (out.bytes < maxBytes) {
+        const r = await reader.read();
+        if (r.done || !r.value) break;
+        if (out.first < 0 && r.value.length) out.first = r.value[0];
+        // só o começo vira texto; o resto só é contado
+        if (out.bytes < textMax) chunks.push(r.value);
+        out.bytes += r.value.length;
+      }
+      reader.cancel().catch(() => undefined);
+    }
+  } catch (err) {
+    out.timedOut = ctrl.signal.aborted;
+    out.error = String((err as Error).message || err);
+  } finally {
+    clearTimeout(timer);
+    out.ms = Date.now() - t0;
+    ctrl.abort();
+  }
+  out.text = decodeStart(chunks, opts.textMax || 2048);
+  return out;
+}
+
+function decodeStart(chunks: Uint8Array[], max: number): string {
+  let size = 0;
+  for (const c of chunks) size += c.length;
+  const buf = new Uint8Array(Math.min(size, max));
+  let at = 0;
+  for (const c of chunks) {
+    if (at >= buf.length) break;
+    const part = c.subarray(0, buf.length - at);
+    buf.set(part, at);
+    at += part.length;
+  }
+  return new TextDecoder().decode(buf);
 }
 
 function base(p: PlaylistConfig): string {
@@ -58,19 +139,6 @@ export function movieUrl(p: PlaylistConfig, id: number, ext: string): string {
 
 export function episodeUrl(p: PlaylistConfig, id: string, ext: string): string {
   return `${base(p)}/series/${p.username}/${p.password}/${id}.${ext || 'mp4'}`;
-}
-
-/** Testa a conta antes de salvar a lista. */
-export async function checkAccount(p: PlaylistConfig): Promise<{ ok: boolean; message: string; expires?: number }> {
-  try {
-    const d = await fetchJSON<Raw>(apiUrl(p), 20000);
-    const ui = d && d.user_info;
-    if (!ui || String(ui.auth) === '0') return { ok: false, message: 'auth' };
-    if (ui.status && ui.status !== 'Active') return { ok: false, message: String(ui.status) };
-    return { ok: true, message: 'ok', expires: toNumber(ui.exp_date) };
-  } catch (err) {
-    return { ok: false, message: String((err as Error).message || err) };
-  }
 }
 
 /** IDs de categoria do Xtream se repetem entre tipos: prefixamos com l:/m:/s:. */
