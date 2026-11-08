@@ -36,6 +36,19 @@ export interface Rect {
 
 export const FULL: Rect = { x: 0, y: 0, w: 1920, h: 1080 };
 
+/**
+ * Proporção da imagem. `fit` mantém a do stream (faixas pretas), `fill` estica para a tela toda
+ * (stream SD/4:3 ou que informa a proporção errada), `auto` deixa a TV decidir pelo stream.
+ */
+export type Aspect = 'fit' | 'fill' | 'auto';
+export const ASPECTS: Aspect[] = ['fit', 'auto', 'fill'];
+
+const DISPLAY_MODE: Record<Aspect, string> = {
+  fit: 'PLAYER_DISPLAY_MODE_LETTER_BOX',
+  fill: 'PLAYER_DISPLAY_MODE_FULL_SCREEN',
+  auto: 'PLAYER_DISPLAY_MODE_AUTO_ASPECT_RATIO',
+};
+
 const noop: EngineEvents = { onBuffering() {}, onPlaying() {}, onTime() {}, onEnd() {}, onError() {} };
 
 interface AVPlay {
@@ -88,7 +101,9 @@ function safe<T>(fn: () => T, fallback: T): T {
 const [rect, setRectSignal] = createSignal<Rect>(FULL);
 /** URL aberta agora ('' = nada tocando). */
 const [currentUrl, setCurrentUrl] = createSignal('');
-export { currentUrl, rect };
+/** No Mac a camada <video> segue este sinal (object-fit); na TV vai para o AVPlay. */
+const [aspect, setAspectSignal] = createSignal<Aspect>('fit');
+export { aspect, currentUrl, rect };
 
 let events: EngineEvents = noop;
 let subtitleOn = false;
@@ -119,6 +134,13 @@ export const player = {
     if (av && currentUrl()) safe(() => av.setDisplayRect(r.x, r.y, r.w, r.h), undefined);
   },
 
+  /** Vale para o vídeo aberto agora (se houver) e para os próximos. */
+  setAspect(a: Aspect) {
+    setAspectSignal(a);
+    const av = avplay();
+    if (av && currentUrl()) safe(() => av.setDisplayMethod(DISPLAY_MODE[a]), undefined);
+  },
+
   open(url: string, startMs = 0): Promise<void> {
     const mine = ++opened;
     setCurrentUrl(url);
@@ -137,7 +159,7 @@ export const player = {
         av.open(url);
         const r = rect();
         av.setDisplayRect(r.x, r.y, r.w, r.h);
-        av.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX');
+        av.setDisplayMethod(DISPLAY_MODE[aspect()]);
         av.setListener({
           onbufferingstart: () => mine === opened && events.onBuffering(),
           onbufferingprogress: () => undefined,
