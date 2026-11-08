@@ -1,6 +1,7 @@
 // Preferências do usuário, persistidas no localStorage da TV (pequeno e síncrono no boot).
 import { createStore, unwrap } from 'solid-js/store';
 import type { Filters, PlaylistConfig, Quality } from '../data/types';
+import type { Aspect } from '../player/engine';
 
 export type QualityPref = 'auto' | Exclude<Quality, ''>;
 
@@ -20,6 +21,8 @@ export interface Settings {
   quality: QualityPref;
   autoQuality: boolean;
   streamFormat: 'ts' | 'm3u8';
+  /** Proporção da imagem no player (vale para todos os vídeos). */
+  aspect: Aspect;
   /** Segundos antes do fim em que aparece o botão "Próximo episódio" (0 = desligado). */
   nextEpisodeAt: number;
   playlists: PlaylistConfig[];
@@ -48,6 +51,7 @@ const defaults: Settings = {
   quality: 'FHD',
   autoQuality: true,
   streamFormat: 'ts',
+  aspect: 'fit',
   nextEpisodeAt: 60,
   playlists: [],
   activePlaylist: null,

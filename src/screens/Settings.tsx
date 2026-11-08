@@ -3,7 +3,7 @@ import { createMemo, createResource, createSignal, For, type JSX, Match, onClean
 import { call } from '../data/client';
 import type { Category, Kind, PlaylistConfig } from '../data/types';
 import { FocusZone, useList } from '../app/focus';
-import { fmtAgo, fmtDay, LOCALES, t } from '../app/i18n';
+import { fmtAgo, fmtDay, LOCALES, type MessageKey, t } from '../app/i18n';
 import { dropPendingProgress } from '../app/progress';
 import { go, reset } from '../app/router';
 import { type QualityPref, removePlaylistSetting, setSetting, settings } from '../app/settings';
@@ -13,6 +13,7 @@ import { Logo } from '../ui/Icon';
 import { Badge, Toggle } from '../ui/primitives';
 import { PinDialog } from '../ui/overlays';
 import { VGrid } from '../ui/VGrid';
+import { ASPECTS } from '../player/engine';
 import { applyUpdate, checkForUpdate, running, updateStatus } from '../app/update';
 import { health, healthLine, syncErrorText } from '../app/health';
 
@@ -264,6 +265,7 @@ function PlayerPanel() {
   const other = (): OptionItem[] => [
     { id: 'auto-switch', label: t('player.autoSwitch'), hint: t('player.settings.autoHint'), right: () => <Toggle on={settings.autoQuality} /> },
     { id: 'format', label: t('player.settings.format'), hint: settings.streamFormat === 'ts' ? t('player.settings.ts') : t('player.settings.hls') },
+    { id: 'aspect', label: t('player.aspect'), hint: `${t(('player.aspect.' + settings.aspect) as MessageKey)} · ${t('player.aspect.hint')}` },
   ];
   const nextAt = (): OptionItem[] => [
     { id: '0', label: t('common.off') },
@@ -285,6 +287,7 @@ function PlayerPanel() {
         items={other}
         onSelect={(id) => {
           if (id === 'auto-switch') setSetting('autoQuality', !settings.autoQuality);
+          else if (id === 'aspect') setSetting('aspect', ASPECTS[(ASPECTS.indexOf(settings.aspect) + 1) % ASPECTS.length]);
           else setSetting('streamFormat', settings.streamFormat === 'ts' ? 'm3u8' : 'ts');
         }}
       />

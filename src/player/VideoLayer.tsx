@@ -5,12 +5,12 @@
 // menos o furo da caixinha (src/screens/Live.tsx). Encolher/mover o <object> deixava a prévia preta.
 // No Mac (<video> HTML5) não existe setDisplayRect, então ali o elemento segue o retângulo.
 import { Show } from 'solid-js';
-import { attachVideoElement, currentUrl, hasNativePlayer, rect } from './engine';
+import { aspect, attachVideoElement, currentUrl, hasNativePlayer, rect } from './engine';
 
 export function VideoLayer() {
   const style = () => {
     const r = rect();
-    return { left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` };
+    return { left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px`, 'object-fit': (aspect() === 'fill' ? 'fill' : 'contain') as 'fill' | 'contain' };
   };
   return (
     <Show when={hasNativePlayer()} fallback={<video ref={attachVideoElement} class="video-layer" classList={{ hidden: !currentUrl() }} style={style()} autoplay />}>

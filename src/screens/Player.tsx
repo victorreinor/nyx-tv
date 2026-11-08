@@ -6,12 +6,12 @@ import { FocusZone, pushKeyHandler, trapCount } from '../app/focus';
 import { fmtClock, fmtTime, type MessageKey, t } from '../app/i18n';
 import { keyName, type KeyName } from '../app/keys';
 import { back, type Media, replace } from '../app/router';
-import { settings } from '../app/settings';
+import { setSetting, settings } from '../app/settings';
 import { saveProgress as storeProgress } from '../app/progress';
 import { setLastChannel, toast, toggleFav } from '../app/state';
 import { checkHealth, healthLine } from '../app/health';
 import type { HealthReport } from '../data/types';
-import { FULL, player, type Tracks } from '../player/engine';
+import { type Aspect, ASPECTS, FULL, player, type Tracks } from '../player/engine';
 import { SLEEP_OPTIONS, setSleepTimer, sleepAt, sleepChoice } from '../player/sleep';
 import { VGrid } from '../ui/VGrid';
 import { nextFallback, pickStart, StallMonitor } from '../player/quality';
@@ -40,6 +40,7 @@ const ADVANCE_MS = 1000;
 export function Player(props: { media: Media }) {
   const m = props.media;
   const clock = useClock(30000);
+  player.setAspect(settings.aspect);
 
   const [status, setStatus] = createSignal<'loading' | 'playing' | 'buffering' | 'error'>('loading');
   /** Último erro do AVPlay (detalhe técnico na tela de erro). */
@@ -647,6 +648,7 @@ export function Player(props: { media: Media }) {
       hint: min && min === sleepChoice() && sleepAt() ? t('player.sleepAt', { t: fmtTime(sleepAt()! / 1000) }) : undefined,
     })),
   );
+  const aspectOptions = createMemo<OptionItem[]>(() => ASPECTS.map((a) => ({ id: a, label: t(('player.aspect.' + a) as MessageKey) })));
   const qualityOptions = createMemo<OptionItem[]>(() => {
     const seen: Quality[] = [];
     sources().forEach((s) => s.quality && seen.indexOf(s.quality) === -1 && seen.push(s.quality));
@@ -836,6 +838,17 @@ export function Player(props: { media: Media }) {
               }}
             />
           </Show>
+          <span class="t-micro c-3 player__panel-label">{t('player.aspect')}</span>
+          <OptionList
+            axis="row"
+            class="player__sleep"
+            items={aspectOptions}
+            selected={() => settings.aspect}
+            onSelect={(id) => {
+              setSetting('aspect', id as Aspect);
+              player.setAspect(id as Aspect);
+            }}
+          />
           <span class="t-micro c-3 player__panel-label">{t('player.sleepMin')}</span>
           <OptionList
             axis="row"
