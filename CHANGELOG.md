@@ -4,6 +4,14 @@ Versões seguem [SemVer](https://semver.org/lang/pt-BR/): **correção** sobe o 
 **funcionalidade** sobe o do meio (1.1.0), **mudança grande** sobe o primeiro (2.0.0).
 Gerado por `bun run release patch|minor|major`.
 
+## [1.6.0] — 2026-11-08
+
+### Novidades
+- diagnóstico da lista, erros que explicam o motivo e episódios novos conferidos
+
+### Correções
+- modal aberta não perde mais o foco para a tela de trás (lembrete sem botão focado)
+
 ## [1.5.0] — 2026-11-07
 
 ### Novidades
