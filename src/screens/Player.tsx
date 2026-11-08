@@ -589,7 +589,9 @@ export function Player(props: { media: Media }) {
       }
       const v = monitor.verdict();
       if (!v) return;
-      if (m.kind === 'live' && (settings.autoQuality || v === 'startup')) fallback(v === 'startup' ? 'open' : 'stall');
+      // canal com uma qualidade só: não há para onde trocar, então travar segue carregando (não vira erro)
+      const canSwitch = settings.autoQuality && sources().length > 1;
+      if (m.kind === 'live' && (canSwitch || v === 'startup')) fallback(v === 'startup' ? 'open' : 'stall');
     }, 1000);
   });
 
@@ -649,9 +651,14 @@ export function Player(props: { media: Media }) {
     })),
   );
   const aspectOptions = createMemo<OptionItem[]>(() => ASPECTS.map((a) => ({ id: a, label: t(('player.aspect.' + a) as MessageKey) })));
-  const qualityOptions = createMemo<OptionItem[]>(() => {
+  /** Qualidades distintas do canal. Com uma só, não há o que escolher (nem "Automático"). */
+  const qualities = createMemo(() => {
     const seen: Quality[] = [];
     sources().forEach((s) => s.quality && seen.indexOf(s.quality) === -1 && seen.push(s.quality));
+    return seen;
+  });
+  const qualityOptions = createMemo<OptionItem[]>(() => {
+    const seen = qualities();
     return [
       { id: 'auto', label: t('player.auto'), hint: manual() ? undefined : t('player.autoNow', { q: quality() || '—' }) },
       ...seen.map((q) => ({ id: q, label: q === 'FHD' ? 'Full HD' : q, hint: q === 'SD' ? t('player.economy') : undefined })),
@@ -811,7 +818,7 @@ export function Player(props: { media: Media }) {
             <span class="colorkey colorkey--yellow" />
             <h2 class="t-section">{t('player.options')}</h2>
           </div>
-          <Show when={m.kind === 'live' && qualityOptions().length > 1}>
+          <Show when={m.kind === 'live' && qualities().length > 1}>
             <span class="t-micro c-3 player__panel-label">{t('player.quality')}</span>
             <OptionList items={qualityOptions} selected={() => manual() || 'auto'} onSelect={(id) => chooseQuality(id as Quality | 'auto')} />
           </Show>
