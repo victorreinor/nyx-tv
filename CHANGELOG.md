@@ -4,6 +4,14 @@ Versões seguem [SemVer](https://semver.org/lang/pt-BR/): **correção** sobe o 
 **funcionalidade** sobe o do meio (1.1.0), **mudança grande** sobe o primeiro (2.0.0).
 Gerado por `bun run release patch|minor|major`.
 
+## [1.7.0] — 2026-11-08
+
+### Novidades
+- proporção da tela no player (Original, Auto, Preencher)
+
+### Correções
+- canal com uma qualidade só não mostra "Automático" nem vira erro ao travar
+
 ## [1.6.0] — 2026-11-08
 
 ### Novidades
