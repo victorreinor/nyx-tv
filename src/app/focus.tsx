@@ -55,6 +55,23 @@ export { active };
 const [trapCount, setTrapCount] = createSignal(0);
 export { trapCount };
 
+/**
+ * Camadas isoladas abertas, da mais antiga para a mais nova. Enquanto houver uma, o foco não sai
+ * dela: pedidos de foco de fora (tela de trás carregando dados, grade voltando ao canal, troca de
+ * tela) ficam guardados em `restore` e só valem quando a camada fecha.
+ */
+const traps: { zone: Zone; restore: (() => void) | null }[] = [];
+const topTrap = () => traps[traps.length - 1];
+const insideTop = (n: FNode) => {
+  const t = topTrap();
+  return !t || n === t.zone || contains(t.zone, n);
+};
+/** Ainda está montado (a tela de trás pode ter trocado enquanto a camada estava aberta). */
+function mounted(n: FNode): boolean {
+  for (let c: FNode = n; c.parent; c = c.parent) if (c.parent.children.indexOf(c) === -1) return false;
+  return true;
+}
+
 /** Zona que pediu foco mas ainda não tinha itens (dados carregando). */
 let pending: Zone | null = null;
 
@@ -91,6 +108,10 @@ function descend(n: FNode): FList | null {
 }
 
 function activate(l: FList) {
+  if (!insideTop(l)) {
+    topTrap().restore = () => mounted(l) && activate(l);
+    return;
+  }
   let child: FNode = l;
   for (let z = l.parent; z; z = z.parent) {
     z.last = child;
@@ -125,7 +146,7 @@ function stepInList(l: FList, dir: Dir): number {
 /** Move o foco. Retorna false se não havia para onde ir. */
 export function move(dir: Dir): boolean {
   const cur = active();
-  if (!cur) return focusZone(root);
+  if (!cur) return focusZone(topTrap() ? topTrap().zone : root);
   const ni = stepInList(cur, dir);
   if (ni !== -1) {
     cur.setIndex(ni);
@@ -152,6 +173,10 @@ export function move(dir: Dir): boolean {
 
 /** Foca a zona (no último item lembrado). Se ainda não tem itens, foca assim que tiver. */
 export function focusZone(z: Zone): boolean {
+  if (!insideTop(z)) {
+    topTrap().restore = () => mounted(z) && focusZone(z);
+    return false;
+  }
   const leaf = descend(z);
   if (leaf) {
     activate(leaf);
@@ -161,10 +186,11 @@ export function focusZone(z: Zone): boolean {
   return false;
 }
 
-/** Tira o foco de tudo (troca de tela: a anterior fica escondida e não pode receber tecla). */
+/** Tira o foco de tudo (troca de tela: a anterior fica escondida e não pode receber tecla). Camada aberta fica com o foco. */
 export function clearFocus() {
   pending = null;
-  setActive(null);
+  const cur = active();
+  if (!cur || !topTrap() || !insideTop(cur)) setActive(null);
 }
 
 export function focusList(l: FList, index?: number) {
@@ -231,14 +257,21 @@ export function FocusZone(props: ZoneProps) {
     onKey: (k) => (props.onKey ? props.onKey(k) : false),
   };
   const previous = props.trap ? active() : null;
-  if (props.trap) setTrapCount(trapCount() + 1);
+  const trap = props.trap ? { zone, restore: previous ? () => mounted(previous) && activate(previous) : null } : null;
+  if (trap) {
+    traps.push(trap);
+    setTrapCount(traps.length);
+  }
   if (!props.trap) parent.children.push(zone);
   if (props.ref) props.ref(zone);
   onMount(() => {
     if (props.autofocus || props.trap) focusZone(zone);
   });
   onCleanup(() => {
-    if (props.trap) setTrapCount(trapCount() - 1);
+    if (trap) {
+      traps.splice(traps.indexOf(trap), 1);
+      setTrapCount(traps.length);
+    }
     if (!props.trap) {
       const i = parent.children.indexOf(zone);
       if (i !== -1) parent.children.splice(i, 1);
@@ -248,8 +281,11 @@ export function FocusZone(props: ZoneProps) {
     const cur = active();
     if (cur && contains(zone, cur)) {
       setActive(null);
-      if (props.trap && previous) activate(previous);
-      else if (!props.trap) focusZone(parent);
+      // camada fechou: volta para onde estava, ou para o último foco pedido enquanto ela estava aberta
+      if (trap) {
+        if (trap.restore) trap.restore();
+        if (!active()) focusZone(root);
+      } else focusZone(parent);
     }
   });
   return (
