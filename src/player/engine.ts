@@ -111,6 +111,38 @@ let subtitleOn = false;
 let opened = 0;
 let video: HTMLVideoElement | undefined;
 
+/**
+ * AVPlay abrindo (prepareAsync) ou saltando. stop/close no meio disso pode travar a TV de vez (o
+ * sistema acaba fechando o app), então quem precisa fechar ou trocar de vídeo espera terminar.
+ * Se o AVPlay não responder em BUSY_MAX_MS, segue mesmo assim para não ficar parado para sempre.
+ */
+const BUSY_MAX_MS = 20000;
+let busy = 0;
+let waiting: Array<() => void> = [];
+
+function whenIdle(fn: () => void) {
+  if (busy === 0) fn();
+  else waiting.push(fn);
+}
+
+/** Marca o AVPlay como ocupado. Devolve quem libera (pode chamar mais de uma vez). */
+function begin(): () => void {
+  busy++;
+  let ended = false;
+  const end = () => {
+    if (ended) return;
+    ended = true;
+    clearTimeout(cap);
+    busy--;
+    if (busy > 0) return;
+    const run = waiting;
+    waiting = [];
+    run.forEach((fn) => fn());
+  };
+  const cap = setTimeout(end, BUSY_MAX_MS);
+  return end;
+}
+
 /** Chamado pela camada de vídeo do App (no Mac é um <video>; na TV, o <object> do AVPlay). */
 export function attachVideoElement(el: HTMLVideoElement | undefined) {
   video = el;
@@ -152,9 +184,16 @@ export const player = {
       if (startMs) video.currentTime = startMs / 1000;
       return video.play();
     }
-    safe(() => av.stop(), undefined);
-    safe(() => av.close(), undefined);
     return new Promise((resolve, reject) => {
+      // outro vídeo ainda abrindo: troca só quando ele terminar (ou desiste, se já chegou outro pedido)
+      whenIdle(() => (mine === opened ? load(resolve, reject) : resolve()));
+    });
+
+    function load(resolve: () => void, reject: (e: Error) => void) {
+      if (!av) return resolve();
+      safe(() => av.stop(), undefined);
+      safe(() => av.close(), undefined);
+      const end = begin();
       try {
         av.open(url);
         const r = rect();
@@ -172,8 +211,14 @@ export const player = {
         });
         av.prepareAsync(
           () => {
-            if (mine !== opened) return resolve();
+            // saiu ou trocou enquanto abria: não toca (quem pediu o fechamento fecha agora)
+            if (mine !== opened) {
+              end();
+              return resolve();
+            }
             const start = () => {
+              end();
+              if (mine !== opened) return resolve();
               safe(() => av.play(), undefined);
               events.onPlaying();
               resolve();
@@ -181,12 +226,17 @@ export const player = {
             if (startMs > 0) av.seekTo(startMs, start, start);
             else start();
           },
-          (e) => reject(new Error(String(e))),
+          (e) => {
+            end();
+            if (mine !== opened) resolve();
+            else reject(new Error(String(e)));
+          },
         );
       } catch (e) {
+        end();
         reject(e instanceof Error ? e : new Error(String(e)));
       }
-    });
+    }
   },
 
   play() {
@@ -202,8 +252,8 @@ export const player = {
   },
 
   /**
-   * `defer`: deixa a tela trocar antes de fechar o AVPlay. stop/close no meio de abrir ou saltar
-   * podem segurar a TV por segundos; assim quem apertou Voltar já vê a tela anterior.
+   * Abrindo ou saltando, o fechamento espera o AVPlay terminar (ver `begin`). `defer`: deixa a tela
+   * trocar antes de fechar, para quem apertou Voltar já ver a tela anterior.
    * Se outro vídeo abrir (ou alguém parar de novo) antes disso, o fechamento adiado não faz nada.
    */
   stop(defer = false) {
@@ -216,8 +266,9 @@ export const player = {
         safe(() => av.stop(), undefined);
         safe(() => av.close(), undefined);
       };
-      if (defer) requestAnimationFrame(() => setTimeout(release, 30));
-      else release();
+      if (busy > 0) console.log('[player] fechamento espera o AVPlay terminar de abrir');
+      if (defer) requestAnimationFrame(() => setTimeout(() => whenIdle(release), 30));
+      else whenIdle(release);
     } else if (video) {
       video.pause();
       video.removeAttribute('src');
@@ -233,7 +284,18 @@ export const player = {
       // seekTo antes de PLAYING/PAUSED/READY prende o AVPlay (e a TV) em arquivo lento
       const state = safe(() => av.getState(), 'NONE');
       if (state !== 'PLAYING' && state !== 'PAUSED' && state !== 'READY') return Promise.resolve();
-      return new Promise((resolve) => safe(() => av.seekTo(target, () => resolve(), () => resolve()), resolve()));
+      return new Promise((resolve) => {
+        const end = begin();
+        const done = () => {
+          end();
+          resolve();
+        };
+        try {
+          av.seekTo(target, done, done);
+        } catch {
+          done();
+        }
+      });
     }
     if (!video) return Promise.resolve();
     const v = video;
