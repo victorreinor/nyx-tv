@@ -13,7 +13,7 @@ import { Logo } from '../ui/Icon';
 import { Badge, Toggle } from '../ui/primitives';
 import { PinDialog } from '../ui/overlays';
 import { VGrid } from '../ui/VGrid';
-import { ASPECTS } from '../player/engine';
+import { ASPECTS, BUFFER_OPTIONS } from '../player/engine';
 import { applyUpdate, checkForUpdate, running, updateStatus } from '../app/update';
 import { health, healthLine, syncErrorText } from '../app/health';
 
@@ -275,6 +275,7 @@ function PlayerPanel() {
     { id: '120', label: '2 min' },
     { id: '180', label: '3 min' },
   ];
+  const buffers = (): OptionItem[] => BUFFER_OPTIONS.map((s) => ({ id: String(s), label: s ? `${s} s` : t('player.auto') }));
   return (
     <Panel title={t('player.settings.quality')}>
       <OptionList items={qualities} selected={() => settings.quality} onSelect={(id) => setSetting('quality', id as QualityPref)} />
@@ -282,6 +283,11 @@ function PlayerPanel() {
       <p class="t-caption c-3">{t('player.settings.nextAtHint')}</p>
       <div class="settings__chips">
         <OptionList axis="row" class="settings__inline" items={nextAt} selected={() => String(settings.nextEpisodeAt)} onSelect={(id) => setSetting('nextEpisodeAt', Number(id))} />
+      </div>
+      <h3 class="t-card settings__subtitle">{t('player.settings.buffer')}</h3>
+      <p class="t-caption c-3">{t('player.settings.bufferHint')}</p>
+      <div class="settings__chips">
+        <OptionList axis="row" class="settings__inline" items={buffers} selected={() => String(settings.buffer)} onSelect={(id) => setSetting('buffer', Number(id))} />
       </div>
       <OptionList
         items={other}

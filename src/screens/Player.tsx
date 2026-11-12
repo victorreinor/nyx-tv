@@ -14,7 +14,7 @@ import type { HealthReport } from '../data/types';
 import { type Aspect, ASPECTS, FULL, player, type Tracks } from '../player/engine';
 import { SLEEP_OPTIONS, setSleepTimer, sleepAt, sleepChoice } from '../player/sleep';
 import { VGrid } from '../ui/VGrid';
-import { nextFallback, pickStart, StallMonitor } from '../player/quality';
+import { nextFallback, pickStart, StallMonitor, stallRules } from '../player/quality';
 import { OptionList, type OptionItem } from '../ui/controls';
 import { Icon } from '../ui/Icon';
 import { Badge, ColorKeys, Img, LiveBadge, ProgressBar, Spinner } from '../ui/primitives';
@@ -41,6 +41,9 @@ export function Player(props: { media: Media }) {
   const m = props.media;
   const clock = useClock(30000);
   player.setAspect(settings.aspect);
+  player.setBuffer(settings.buffer);
+  /** Buffer maior = o AVPlay espera mais para começar e para voltar: os limites crescem junto. */
+  const bufferMs = settings.buffer * 1000;
 
   const [status, setStatus] = createSignal<'loading' | 'playing' | 'buffering' | 'error'>('loading');
   /** Último erro do AVPlay (detalhe técnico na tela de erro). */
@@ -100,7 +103,7 @@ export function Player(props: { media: Media }) {
   const [sources, setSources] = createSignal<PlaySource[]>([]);
   const [srcIndex, setSrcIndex] = createSignal(-1);
   const [manual, setManual] = createSignal<Quality | null>(null);
-  const monitor = new StallMonitor();
+  const monitor = new StallMonitor(stallRules(settings.buffer));
   let tried = new Set<number>();
 
   // vod
@@ -578,8 +581,8 @@ export function Player(props: { media: Media }) {
     watchdog = setInterval(() => {
       if (status() === 'error' || seeking) return;
       if (m.kind !== 'live') {
-        if (status() === 'loading' && landing() === null && vodOpenedAt && Date.now() - vodOpenedAt > VOD_STARTUP_MS) retryVod();
-        else if (status() !== 'playing' && (status() === 'buffering' || landing() !== null) && waitSec() > VOD_STALL_S) setStatus('error');
+        if (status() === 'loading' && landing() === null && vodOpenedAt && Date.now() - vodOpenedAt > VOD_STARTUP_MS + bufferMs) retryVod();
+        else if (status() !== 'playing' && (status() === 'buffering' || landing() !== null) && waitSec() > VOD_STALL_S + settings.buffer) setStatus('error');
         else if (status() === 'playing' && !paused() && seekTarget() === null && lastAdvanceAt && Date.now() - lastAdvanceAt > SILENT_STALL_MS) {
           // diz que toca, mas o tempo não anda: mostra que está carregando (e o limite de 30 s vale)
           resumeRef = null;

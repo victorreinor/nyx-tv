@@ -43,6 +43,9 @@ export const FULL: Rect = { x: 0, y: 0, w: 1920, h: 1080 };
 export type Aspect = 'fit' | 'fill' | 'auto';
 export const ASPECTS: Aspect[] = ['fit', 'auto', 'fill'];
 
+/** Segundos de vídeo que o AVPlay junta antes de tocar e de voltar de uma travada (0 = a TV decide). */
+export const BUFFER_OPTIONS = [0, 2, 5, 10, 15, 20];
+
 const DISPLAY_MODE: Record<Aspect, string> = {
   fit: 'PLAYER_DISPLAY_MODE_LETTER_BOX',
   fill: 'PLAYER_DISPLAY_MODE_FULL_SCREEN',
@@ -69,6 +72,7 @@ interface AVPlay {
   getCurrentStreamInfo?(): { index: number; type: string }[];
   setSelectTrack?(type: string, index: number): void;
   setSilentSubtitle?(silent: boolean): void;
+  setBufferingParam?(option: string, unit: string, amount: number): void;
 }
 
 function parseLang(extra: string): string {
@@ -104,6 +108,8 @@ const [currentUrl, setCurrentUrl] = createSignal('');
 /** No Mac a camada <video> segue este sinal (object-fit); na TV vai para o AVPlay. */
 const [aspect, setAspectSignal] = createSignal<Aspect>('fit');
 export { aspect, currentUrl, rect };
+/** Buffer pedido pelo usuário, em segundos (0 = padrão da TV). Vale a partir do próximo vídeo aberto. */
+let bufferSec = 0;
 
 let events: EngineEvents = noop;
 let subtitleOn = false;
@@ -173,6 +179,11 @@ export const player = {
     if (av && currentUrl()) safe(() => av.setDisplayMethod(DISPLAY_MODE[a]), undefined);
   },
 
+  /** Vale para os próximos vídeos (o AVPlay só aceita antes do prepare). */
+  setBuffer(sec: number) {
+    bufferSec = sec > 0 ? sec : 0;
+  },
+
   open(url: string, startMs = 0): Promise<void> {
     const mine = ++opened;
     setCurrentUrl(url);
@@ -199,6 +210,14 @@ export const player = {
         const r = rect();
         av.setDisplayRect(r.x, r.y, r.w, r.h);
         av.setDisplayMethod(DISPLAY_MODE[aspect()]);
+        if (bufferSec && av.setBufferingParam) {
+          try {
+            av.setBufferingParam('PLAYER_BUFFER_FOR_PLAY', 'PLAYER_BUFFER_SIZE_IN_SECOND', bufferSec);
+            av.setBufferingParam('PLAYER_BUFFER_FOR_RESUME', 'PLAYER_BUFFER_SIZE_IN_SECOND', bufferSec);
+          } catch (e) {
+            console.warn('[player] buffer ' + bufferSec + ' s recusado: ' + String(e));
+          }
+        }
         av.setListener({
           onbufferingstart: () => mine === opened && events.onBuffering(),
           onbufferingprogress: () => undefined,

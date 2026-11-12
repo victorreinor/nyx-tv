@@ -47,6 +47,15 @@ export interface StallRules {
 export const DEFAULT_RULES: StallRules = { startupMs: 9000, windowMs: 60000, maxStalls: 3, maxBufferingMs: 7000 };
 
 /**
+ * Regras com o buffer escolhido pelo usuário: o AVPlay só toca (e só volta de uma travada) depois
+ * de juntar `bufferSec` segundos, então essa espera não pode contar como "não está aguentando".
+ */
+export function stallRules(bufferSec: number): StallRules {
+  const extra = Math.max(0, bufferSec) * 1000;
+  return { ...DEFAULT_RULES, startupMs: DEFAULT_RULES.startupMs + extra, maxBufferingMs: DEFAULT_RULES.maxBufferingMs + extra };
+}
+
+/**
  * Observa os eventos do player e diz quando a qualidade atual não está aguentando.
  * O relógio é injetado para testar sem esperar de verdade.
  */

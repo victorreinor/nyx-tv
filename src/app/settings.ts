@@ -23,6 +23,8 @@ export interface Settings {
   streamFormat: 'ts' | 'm3u8';
   /** Proporção da imagem no player (vale para todos os vídeos). */
   aspect: Aspect;
+  /** Buffer do player em segundos (0 = automático, a TV decide). */
+  buffer: number;
   /** Segundos antes do fim em que aparece o botão "Próximo episódio" (0 = desligado). */
   nextEpisodeAt: number;
   playlists: PlaylistConfig[];
@@ -52,6 +54,7 @@ const defaults: Settings = {
   autoQuality: true,
   streamFormat: 'ts',
   aspect: 'fit',
+  buffer: 0,
   nextEpisodeAt: 60,
   playlists: [],
   activePlaylist: null,

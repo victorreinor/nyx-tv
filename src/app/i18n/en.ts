@@ -210,6 +210,8 @@ export const en: Record<MessageKey, string> = {
   'history.cleared': 'History cleared',
   'player.settings.nextAt': '“Next episode” button',
   'player.settings.nextAtHint': 'Shows up when this much time is left in the episode.',
+  'player.settings.buffer': 'Buffer',
+  'player.settings.bufferHint': 'Seconds of video stored before playing and when recovering from a stall. A bigger buffer stalls less, but channels take longer to open and live TV runs that many seconds behind.',
   'player.nextEpisodeBtn': 'Next episode',
   'common.off': 'Off',
   'player.options': 'Options',
