@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { nextFallback, pickStart, StallMonitor } from '../src/player/quality';
+import { DEFAULT_RULES, nextFallback, pickStart, StallMonitor, stallRules } from '../src/player/quality';
 import type { PlaySource, Quality } from '../src/data/types';
 
 const src = (...q: Quality[]): PlaySource[] => q.map((quality, i) => ({ url: 'u' + i, quality, streamId: i }));
@@ -74,6 +74,31 @@ describe('StallMonitor', () => {
     t = 10000;
     m.buffering();
     t = 17500;
+    expect(m.verdict()).toBe('buffering');
+  });
+});
+
+describe('stallRules (buffer escolhido)', () => {
+  test('automático = regras padrão', () => {
+    expect(stallRules(0)).toEqual(DEFAULT_RULES);
+  });
+
+  test('buffer de 10 s não desce a qualidade só por esperar o buffer', () => {
+    let t = 0;
+    const m = new StallMonitor(stallRules(10), () => t);
+    m.reset();
+    t = 15000; // ainda juntando os 10 s antes de tocar
+    expect(m.verdict()).toBeNull();
+    t = 19500;
+    expect(m.verdict()).toBe('startup');
+
+    m.reset();
+    m.playing();
+    t = 30000;
+    m.buffering();
+    t = 41000; // travou e está juntando 10 s para voltar
+    expect(m.verdict()).toBeNull();
+    t = 47500;
     expect(m.verdict()).toBe('buffering');
   });
 });

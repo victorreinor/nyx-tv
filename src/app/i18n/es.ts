@@ -210,6 +210,8 @@ export const es: Record<MessageKey, string> = {
   'history.cleared': 'Historial borrado',
   'player.settings.nextAt': 'Botón “Siguiente episodio”',
   'player.settings.nextAtHint': 'Aparece cuando falta este tiempo para que termine el episodio.',
+  'player.settings.buffer': 'Búfer',
+  'player.settings.bufferHint': 'Segundos de video guardados antes de reproducir y al recuperarse de un corte. Más búfer se corta menos, pero el canal tarda más en abrir y el en vivo queda esos segundos atrasado.',
   'player.nextEpisodeBtn': 'Siguiente episodio',
   'common.off': 'Desactivado',
   'player.options': 'Opciones',

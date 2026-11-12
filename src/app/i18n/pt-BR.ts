@@ -209,6 +209,8 @@ export const ptBR = {
   'history.cleared': 'Histórico limpo',
   'player.settings.nextAt': 'Botão “Próximo episódio”',
   'player.settings.nextAtHint': 'Aparece quando faltar este tempo para o episódio acabar.',
+  'player.settings.buffer': 'Buffer',
+  'player.settings.bufferHint': 'Segundos de vídeo guardados antes de tocar e ao voltar de uma travada. Mais buffer trava menos, mas o canal demora mais para abrir e o ao vivo fica esses segundos atrasado.',
   'player.nextEpisodeBtn': 'Próximo episódio',
   'common.off': 'Desligado',
   'player.options': 'Opções',
