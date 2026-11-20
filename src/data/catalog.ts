@@ -141,10 +141,13 @@ export class Catalog {
     return base > 0 && s.added > base;
   }
 
-  /** Selo de episódio novo: só depois de conferido na lista de episódios (count -1 = sem referência, selo genérico). */
+  /**
+   * Selo de episódio novo: só depois de conferido na lista de episódios (count -1 = sem referência, selo genérico).
+   * Abrir a série não tira o selo: ele fica por `NEW_EP_TTL` ou até você começar um dos novos.
+   */
   newEpisodeOf(s: Series): NewEpisodes | null {
     const r = this.user.state.newEpisodes[String(s.id)];
-    return r && r.added === s.added && r.count !== 0 && this.changedSinceFollowed(s) ? r : null;
+    return r && r.added === s.added && this.user.seriesBaseline(s.id) > 0 && this.user.newEpisodesActive(s.id, r) ? r : null;
   }
 
   /** Séries que você acompanha, mudaram no provedor e ainda não foram conferidas (as mais recentes primeiro). */

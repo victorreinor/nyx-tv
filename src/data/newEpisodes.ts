@@ -19,6 +19,25 @@ export interface NewEpisodes {
   count: number;
   s: number;
   e: number;
+  /** Quando a conferência achou a novidade (s). O selo dura `NEW_EP_TTL` a partir daqui. */
+  at?: number;
+}
+
+/** Quanto tempo o selo fica, mesmo depois de abrir a série (some antes se você começar um dos novos). */
+export const NEW_EP_TTL = 24 * 3600;
+
+/**
+ * O selo ainda vale? Some depois de `NEW_EP_TTL` ou quando você começa um dos episódios novos
+ * (selo sem saber qual: qualquer episódio começado depois da conferência).
+ */
+export function newEpisodesActive(
+  r: NewEpisodes,
+  now: number,
+  started: { season?: number; episode?: number; updatedAt: number }[],
+): boolean {
+  if (r.count === 0 || !r.at || now - r.at >= NEW_EP_TTL) return false;
+  const from = r.s ? episodeKey({ season: r.s, episode: r.e }) : 0;
+  return !started.some((p) => (from ? episodeKey(p) >= from : p.updatedAt / 1000 > (r.at as number)));
 }
 
 /** Ordem de episódio comparável entre temporadas (T2 E1 > T1 E9). */

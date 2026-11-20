@@ -273,7 +273,35 @@ describe('novos episódios', () => {
     expect(cat.card('series', series[0]).newEp).toEqual({ s: 2, e: 1, count: 2 });
     expect(cat.card('series', series[1]).newEp).toBeUndefined();
     expect(cat.home().newEpisodes.map((c) => c.id)).toEqual(['1']);
-    user.markSeriesSeen(1); // abriu a série agora
+    user.markSeriesSeen(1); // abriu a série agora: o selo continua
+    expect(cat.card('series', series[0]).newEp).toEqual({ s: 2, e: 1, count: 2 });
+    expect(cat.newEpisodeCandidates(20)).toEqual([]);
+  });
+
+  test('selo some ao começar um dos novos ou depois de 24 h', async () => {
+    const { Catalog } = await import('../src/data/catalog');
+    const { UserStore } = await import('../src/data/user');
+    const { mapSeries } = await import('../src/data/xtream');
+    const user = new UserStore();
+    const cat = new Catalog(user);
+    const series = mapSeries([{ series_id: 1, name: 'Dark', last_modified: 2000, category_id: 1 }], new Set());
+    cat.setCatalog({ channels: [], movies: [], series, categories: [], at: 1 });
+    user.state.favorites['s:1'] = 1000 * 1000;
+    const now = Date.now() / 1000;
+    user.setNewEpisodes(1, { added: 2000, count: 3, s: 2, e: 1, at: now });
+    const ep = (id: string, season: number, episode: number, position: number) => ({
+      key: 'e:' + id, kind: 'episode' as const, id, seriesId: 1, season, episode, position, duration: 2400, updatedAt: Date.now(), title: 'Dark', image: '',
+    });
+    // reassistir um antigo não conta; abrir um novo por poucos segundos também não
+    user.saveProgress(ep('a', 1, 9, 600));
+    user.saveProgress(ep('b', 2, 1, 5));
+    expect(cat.card('series', series[0]).newEp).toBeDefined();
+    // começou T2 E1: sai das fileiras e o selo some
+    user.saveProgress(ep('b', 2, 1, 60));
+    expect(cat.card('series', series[0]).newEp).toBeUndefined();
+    expect(cat.home().newEpisodes).toEqual([]);
+    // outra série, sem assistir: some depois do prazo
+    user.setNewEpisodes(1, { added: 2000, count: 1, s: 3, e: 1, at: now - 25 * 3600 });
     expect(cat.card('series', series[0]).newEp).toBeUndefined();
   });
 

@@ -2,7 +2,7 @@
 // Tudo em um registro por lista no IndexedDB, gravado com debounce.
 import { loadRecord, saveRecord } from './store';
 import type { Progress, Quality } from './types';
-import { episodeKey, type EpisodeRef, type NewEpisodes } from './newEpisodes';
+import { episodeKey, newEpisodesActive, type EpisodeRef, type NewEpisodes } from './newEpisodes';
 
 export interface UserState {
   favorites: Record<string, number>; // l:<canal> | m:<filme> | s:<série> → adicionado em
@@ -50,6 +50,9 @@ export class UserStore {
     this.pid = pid;
     const saved = await loadRecord<UserState>('user', pid);
     this.state = { ...empty(), ...(saved || {}) };
+    // conferências de antes do prazo do selo: contam a partir de agora
+    const now = Date.now() / 1000;
+    for (const id in this.state.newEpisodes) if (!this.state.newEpisodes[id].at) this.state.newEpisodes[id].at = now;
     this.seriesIndex = null;
   }
 
@@ -129,7 +132,7 @@ export class UserStore {
     this.persist();
   }
 
-  /** Abriu a série: os episódios que existem agora deixam de ser "novos". */
+  /** Abriu a série: a próxima conferência compara com os episódios de agora (o selo atual continua no prazo). */
   markSeriesSeen(seriesId: number) {
     this.state.seenSeries[String(seriesId)] = Date.now() / 1000;
     this.persist();
@@ -141,8 +144,16 @@ export class UserStore {
   }
 
   setNewEpisodes(seriesId: number, v: NewEpisodes) {
-    this.state.newEpisodes[String(seriesId)] = v;
+    this.state.newEpisodes[String(seriesId)] = v.at ? v : { ...v, at: Date.now() / 1000 };
     this.persist();
+  }
+
+  /** O selo de novo episódio da série ainda vale (prazo e episódios novos ainda não começados)? */
+  newEpisodesActive(seriesId: number, r: NewEpisodes, now = Date.now() / 1000): boolean {
+    const started: Progress[] = [];
+    const all = this.state.progress;
+    for (const k in all) if (all[k].seriesId === seriesId && isStarted(all[k])) started.push(all[k]);
+    return newEpisodesActive(r, now, started);
   }
 
   /** Último episódio que você conhece da série: o maior entre o que existia ao abrir e o que assistiu. */

@@ -466,7 +466,7 @@ const api = {
     return tmdbSeason(tvId, season).catch(() => null);
   },
 
-  /** Abriu a página da série: o selo some e os episódios de agora viram a referência do próximo "novo". */
+  /** Abriu a página da série: os episódios de agora viram a referência do próximo "novo" (o selo atual fica no prazo). */
   async markSeriesSeen(seriesId: number) {
     user.markSeriesSeen(seriesId);
     const info = await api.seriesInfo(seriesId).catch(() => null);

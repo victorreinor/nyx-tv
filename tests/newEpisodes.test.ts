@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { diffEpisodes, episodeRef } from '../src/data/newEpisodes';
+import { diffEpisodes, episodeRef, NEW_EP_TTL, newEpisodesActive } from '../src/data/newEpisodes';
 import type { Episode } from '../src/data/types';
 
 const ep = (season: number, episode: number): Episode => ({ id: `${season}-${episode}`, season, episode, title: '', ext: 'mp4', duration: 0, plot: '', image: '' });
@@ -30,5 +30,24 @@ describe('diffEpisodes', () => {
   });
   test('referência só pelo que assistiu (n = 0)', () => {
     expect(diffEpisodes(list([1, 1], [1, 2], [1, 3]), { top: 1002, n: 0 }, 9)).toMatchObject({ count: 1, s: 1, e: 3 });
+  });
+});
+
+describe('newEpisodesActive', () => {
+  const now = 100000;
+  const r = { added: 9, count: 2, s: 2, e: 2, at: now - 3600 };
+  test('dentro do prazo e sem começar os novos', () => {
+    expect(newEpisodesActive(r, now, [{ season: 2, episode: 1, updatedAt: now * 1000 }])).toBe(true);
+  });
+  test('começou um dos novos', () => {
+    expect(newEpisodesActive(r, now, [{ season: 2, episode: 3, updatedAt: 0 }])).toBe(false);
+  });
+  test('passou do prazo', () => {
+    expect(newEpisodesActive({ ...r, at: now - NEW_EP_TTL }, now, [])).toBe(false);
+  });
+  test('selo sem saber qual: qualquer episódio começado depois da conferência', () => {
+    const g = { ...r, s: 0, e: 0 };
+    expect(newEpisodesActive(g, now, [{ season: 1, episode: 1, updatedAt: (now - 7200) * 1000 }])).toBe(true);
+    expect(newEpisodesActive(g, now, [{ season: 1, episode: 1, updatedAt: (now - 60) * 1000 }])).toBe(false);
   });
 });
