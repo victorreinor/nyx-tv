@@ -1,5 +1,15 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_RULES, nextFallback, pickStart, StallMonitor, stallRules } from '../src/player/quality';
+import {
+  DEFAULT_RULES,
+  LEARNED_TTL_MS,
+  liveLearned,
+  nextFallback,
+  pickStart,
+  StallMonitor,
+  stallRules,
+  upgradeDelay,
+  upgradeTarget,
+} from '../src/player/quality';
 import type { PlaySource, Quality } from '../src/data/types';
 
 const src = (...q: Quality[]): PlaySource[] => q.map((quality, i) => ({ url: 'u' + i, quality, streamId: i }));
@@ -100,5 +110,53 @@ describe('stallRules (buffer escolhido)', () => {
     expect(m.verdict()).toBeNull();
     t = 47500;
     expect(m.verdict()).toBe('buffering');
+  });
+});
+
+describe('volta a subir', () => {
+  const s = src('4K', 'FHD', 'HD', 'SD');
+
+  test('qualidade rebaixada vence e o Automático volta a começar em FHD', () => {
+    const l = { q: 'HD' as Quality, at: 0, fails: 0 };
+    expect(liveLearned(l, LEARNED_TTL_MS - 1)).toBe(l);
+    expect(liveLearned(l, LEARNED_TTL_MS)).toBeNull();
+    expect(liveLearned(undefined, 0)).toBeNull();
+    expect(pickStart(s, 'auto', null)).toBe(1);
+  });
+
+  test('espera dobra a cada subida que travou e desiste na terceira', () => {
+    expect(upgradeDelay(0)).toBe(3 * 60000);
+    expect(upgradeDelay(1)).toBe(6 * 60000);
+    expect(upgradeDelay(2)).toBe(12 * 60000);
+    expect(upgradeDelay(3)).toBeNull();
+  });
+
+  test('sobe um nível por vez, sem passar da qualidade-alvo', () => {
+    const target = pickStart(s, 'auto', null); // FHD
+    expect(upgradeTarget(s, 3, target)).toBe(2); // SD → HD
+    expect(upgradeTarget(s, 2, target)).toBe(1); // HD → FHD
+    expect(upgradeTarget(s, 1, target)).toBe(-1); // já no FHD: não vai para 4K
+  });
+
+  test('pula qualidade que o canal não tem', () => {
+    const t = src('FHD', 'SD');
+    expect(upgradeTarget(t, 1, 0)).toBe(0);
+  });
+
+  test('stableFor zera ao travar e conta de novo quando volta', () => {
+    let t = 0;
+    const m = new StallMonitor(DEFAULT_RULES, () => t);
+    m.reset();
+    expect(m.stableFor()).toBe(0);
+    t = 1000;
+    m.playing();
+    t = 61000;
+    expect(m.stableFor()).toBe(60000);
+    m.buffering();
+    t = 62000;
+    expect(m.stableFor()).toBe(0);
+    m.playing();
+    t = 72000;
+    expect(m.stableFor()).toBe(10000);
   });
 });

@@ -33,6 +33,48 @@ export function nextFallback(sources: PlaySource[], tried: Set<number>, current:
   return order.length ? order[0] : -1;
 }
 
+/**
+ * Qualidade que desceu sozinha num canal. Vale por LEARNED_TTL_MS desde a última descida: depois
+ * disso o canal volta a abrir pela qualidade-alvo (no Automático, FHD).
+ */
+export interface Learned {
+  q: Quality;
+  at: number;
+  /** Subidas que travaram de novo neste canal (a espera dobra a cada uma). */
+  fails: number;
+}
+
+export const LEARNED_TTL_MS = 10 * 60000;
+/** Tempo tocando sem travar antes de tentar subir um nível. */
+export const UPGRADE_BASE_MS = 3 * 60000;
+/** Subidas que travaram antes de desistir de subir naquele canal. */
+export const UPGRADE_MAX_FAILS = 3;
+/** Tempo sem travar na qualidade nova para a subida contar como certa. */
+export const UPGRADE_CONFIRM_MS = 60000;
+
+/** Registro ainda válido, ou null se venceu (o canal volta a começar pela qualidade-alvo). */
+export function liveLearned(l: Learned | undefined, now: number): Learned | null {
+  return l && now - l.at < LEARNED_TTL_MS ? l : null;
+}
+
+/** Espera sem travar antes da próxima subida: 3, 6, 12 min; null = desistiu. */
+export function upgradeDelay(fails: number): number | null {
+  return fails >= UPGRADE_MAX_FAILS ? null : UPGRADE_BASE_MS * Math.pow(2, fails);
+}
+
+/** Fonte um nível acima de `current` sem passar da qualidade-alvo, ou -1 se já está nela. */
+export function upgradeTarget(sources: PlaySource[], current: number, target: number): number {
+  if (!sources[current] || !sources[target]) return -1;
+  const cur = QUALITY_RANK[sources[current].quality];
+  const max = QUALITY_RANK[sources[target].quality];
+  let best = -1;
+  sources.forEach((s, i) => {
+    const r = QUALITY_RANK[s.quality];
+    if (r > cur && r <= max && (best === -1 || r < QUALITY_RANK[sources[best].quality])) best = i;
+  });
+  return best;
+}
+
 export interface StallRules {
   /** Tempo máximo para começar a tocar. */
   startupMs: number;
@@ -63,6 +105,8 @@ export class StallMonitor {
   private openedAt = 0;
   private started = false;
   private bufferingSince = 0;
+  /** Desde quando toca sem travar (0 = ainda não tocou ou está carregando). */
+  private calmSince = 0;
   private stalls: { at: number; ms: number }[] = [];
 
   constructor(private rules: StallRules = DEFAULT_RULES, private now: () => number = Date.now) {}
@@ -71,6 +115,7 @@ export class StallMonitor {
     this.openedAt = this.now();
     this.started = false;
     this.bufferingSince = 0;
+    this.calmSince = 0;
     this.stalls = [];
   }
 
@@ -78,16 +123,23 @@ export class StallMonitor {
     if (!this.started) {
       this.started = true;
       this.bufferingSince = 0;
+      this.calmSince = this.now();
       return;
     }
     if (this.bufferingSince) {
       this.stalls.push({ at: this.bufferingSince, ms: this.now() - this.bufferingSince });
       this.bufferingSince = 0;
+      this.calmSince = this.now();
     }
   }
 
   buffering() {
     if (this.started && !this.bufferingSince) this.bufferingSince = this.now();
+  }
+
+  /** Há quanto tempo toca sem travar. */
+  stableFor(): number {
+    return this.started && !this.bufferingSince ? this.now() - this.calmSince : 0;
   }
 
   /** Motivo para trocar de qualidade agora, ou null se está tudo bem. */

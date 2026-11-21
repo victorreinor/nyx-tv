@@ -14,14 +14,27 @@ import type { HealthReport } from '../data/types';
 import { type Aspect, ASPECTS, FULL, player, type Tracks } from '../player/engine';
 import { SLEEP_OPTIONS, setSleepTimer, sleepAt, sleepChoice } from '../player/sleep';
 import { VGrid } from '../ui/VGrid';
-import { nextFallback, pickStart, StallMonitor, stallRules } from '../player/quality';
+import {
+  type Learned,
+  liveLearned,
+  nextFallback,
+  pickStart,
+  StallMonitor,
+  stallRules,
+  UPGRADE_CONFIRM_MS,
+  upgradeDelay,
+  upgradeTarget,
+} from '../player/quality';
 import { OptionList, type OptionItem } from '../ui/controls';
 import { Icon } from '../ui/Icon';
 import { Badge, ColorKeys, Img, LiveBadge, ProgressBar, Spinner } from '../ui/primitives';
 import { useClock } from '../ui/useClock';
 
-/** Qualidade que desceu sozinha nesta sessão do app (não é salva: amanhã tenta de novo a melhor). */
-const learned = new Map<string, Quality>();
+/**
+ * Qualidade que desceu sozinha, por canal. Só na memória e com prazo (`liveLearned`): voltando ao
+ * canal depois disso, o Automático começa de novo pela qualidade-alvo.
+ */
+const learned = new Map<string, Learned>();
 
 const SAVE_EVERY_MS = 5000;
 const OVERLAY_MS = 5000;
@@ -105,6 +118,8 @@ export function Player(props: { media: Media }) {
   const [manual, setManual] = createSignal<Quality | null>(null);
   const monitor = new StallMonitor(stallRules(settings.buffer));
   let tried = new Set<number>();
+  /** Subiu de qualidade e ainda não ficou UPGRADE_CONFIRM_MS sem travar: se travar, conta como falha. */
+  let upgrading = false;
 
   // vod
   const epIndex = () => (m.kind === 'episode' ? m.index : 0);
@@ -160,7 +175,10 @@ export function Player(props: { media: Media }) {
     setSources(src);
     setManual(saved);
     tried = new Set();
-    playSource(pickStart(src, settings.quality, saved || learned.get(id) || null));
+    upgrading = false;
+    const l = liveLearned(learned.get(id), Date.now());
+    if (!l) learned.delete(id);
+    playSource(pickStart(src, settings.quality, saved || (l ? l.q : null)));
   }
 
   function playSource(i: number) {
@@ -198,8 +216,38 @@ export function Player(props: { media: Media }) {
     if (from && to && from !== to) {
       // não abriu ≠ travou: "sinal instável" só quando chegou a tocar
       toast(why === 'open' ? t('player.notOpened', { from, to }) : t('player.downgraded', { from, to }), 4000);
-      learned.set(channelId(), to);
+      const l = learned.get(channelId());
+      learned.set(channelId(), { q: to, at: Date.now(), fails: (l ? l.fails : 0) + (upgrading ? 1 : 0) });
+      upgrading = false;
     }
+    playSource(next);
+  }
+
+  /**
+   * Caiu de qualidade e está tocando sem travar há um tempo: tenta subir um nível (só no Automático,
+   * sem escolha manual). A espera dobra a cada subida que travou, e depois de 3 desiste no canal.
+   */
+  function maybeUpgrade() {
+    const id = channelId();
+    const stable = monitor.stableFor();
+    if (upgrading) {
+      if (stable < UPGRADE_CONFIRM_MS) return;
+      // subida confirmada: na qualidade-alvo esquece a descida; abaixo dela segue subindo
+      upgrading = false;
+      const target = pickStart(sources(), settings.quality, null);
+      if (upgradeTarget(sources(), srcIndex(), target) === -1) learned.delete(id);
+      else learned.set(id, { q: quality(), at: Date.now(), fails: 0 });
+      return;
+    }
+    if (!settings.autoQuality || manual() || status() !== 'playing' || panel() || guide()) return;
+    const l = learned.get(id);
+    const wait = upgradeDelay(l ? l.fails : 0);
+    if (wait === null || stable < wait) return;
+    const next = upgradeTarget(sources(), srcIndex(), pickStart(sources(), settings.quality, null));
+    if (next === -1) return;
+    toast(t('player.upgraded', { from: quality(), to: sources()[next].quality }), 4000);
+    upgrading = true;
+    tried = new Set();
     playSource(next);
   }
 
@@ -230,6 +278,7 @@ export function Player(props: { media: Media }) {
     if (q === 'auto') {
       call('setChannelQuality', id, '');
       learned.delete(id);
+      upgrading = false;
       setManual(null);
       tried = new Set();
       playSource(pickStart(sources(), settings.quality, null));
@@ -237,6 +286,7 @@ export function Player(props: { media: Media }) {
     }
     call('setChannelQuality', id, q);
     setManual(q);
+    upgrading = false;
     tried = new Set();
     playSource(sources().findIndex((s) => s.quality === q));
   }
@@ -591,7 +641,7 @@ export function Player(props: { media: Media }) {
         return;
       }
       const v = monitor.verdict();
-      if (!v) return;
+      if (!v) return maybeUpgrade();
       // canal com uma qualidade só: não há para onde trocar, então travar segue carregando (não vira erro)
       const canSwitch = settings.autoQuality && sources().length > 1;
       if (m.kind === 'live' && (canSwitch || v === 'startup')) fallback(v === 'startup' ? 'open' : 'stall');

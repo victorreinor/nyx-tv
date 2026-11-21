@@ -57,6 +57,7 @@ export const es: Record<MessageKey, string> = {
   'player.auto': 'Automático',
   'player.autoNow': 'ahora en {q}',
   'player.downgraded': 'Señal inestable en {from}, cambiamos a {to}',
+  'player.upgraded': 'Señal estable, volviendo de {from} a {to}',
   'player.failed': 'No se pudo abrir este canal',
   'player.retrying': 'Reconectando…',
   'player.autoSwitch': 'Cambiar solo si se traba',

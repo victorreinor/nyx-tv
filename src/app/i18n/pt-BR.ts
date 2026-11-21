@@ -56,6 +56,7 @@ export const ptBR = {
   'player.auto': 'Automático',
   'player.autoNow': 'agora em {q}',
   'player.downgraded': 'Sinal instável em {from}, mudamos para {to}',
+  'player.upgraded': 'Sinal estável, voltando de {from} para {to}',
   'player.failed': 'Não foi possível abrir este canal',
   'player.retrying': 'Reconectando…',
   'player.autoSwitch': 'Trocar sozinho se travar',
