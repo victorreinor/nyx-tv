@@ -4,6 +4,11 @@ Versões seguem [SemVer](https://semver.org/lang/pt-BR/): **correção** sobe o 
 **funcionalidade** sobe o do meio (1.1.0), **mudança grande** sobe o primeiro (2.0.0).
 Gerado por `bun run release patch|minor|major`.
 
+## [1.10.0] — 2026-11-21
+
+### Novidades
+- qualidade automática volta a subir quando o sinal estabiliza
+
 ## [1.9.0] — 2026-11-20
 
 ### Novidades
